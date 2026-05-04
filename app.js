@@ -186,14 +186,20 @@ function rebuildWallById(id) {
     wall.remove(c);
     if (c.geometry) c.geometry.dispose();
   }
-  // Collect openings whose userData.wallId == id (visible only — hidden openings = solid wall there)
+  // Collect openings whose userData.wallId == id and which sit close enough to the wall
+  // (any door dragged > 0.5 m perpendicular to the wall is treated as "detached" and ignored)
   const ops = [];
   ['Doors', 'Windows'].forEach(layerName => {
     layers[layerName].children.forEach(o => {
-      if (o.userData?.wallId === id && o.visible) {
-        const c = def.axis === 'x' ? o.position.x : o.position.y;
-        ops.push({ c, w: o.userData.openingW, sill: o.userData.openingSill, top: o.userData.openingTop });
-      }
+      if (o.userData?.wallId !== id || !o.visible) return;
+      const perp = def.axis === 'x' ? o.position.y : o.position.x;
+      if (Math.abs(perp - def.lineCoord) > 0.5) return;
+      const along = def.axis === 'x' ? o.position.x : o.position.y;
+      // Clamp opening to within wall bounds (so it doesn't poke past the ends)
+      const w = o.userData.openingW;
+      if (along - w/2 < def.alongStart - 0.01) return;
+      if (along + w/2 > def.alongEnd + 0.01) return;
+      ops.push({ c: along, w, sill: o.userData.openingSill, top: o.userData.openingTop });
     });
   });
   ops.sort((a, b) => a.c - b.c);
@@ -646,9 +652,29 @@ const transform = new TransformControls(camera, renderer.domElement);
 transform.addEventListener('dragging-changed', e => {
   orbit.enabled = !e.value;
   if (!e.value && selected) {
+    // Drag end → if the moved object is a door/window linked to a wall:
+    //   1. Snap it back onto the wall plane (perpendicular axis = wall's lineCoord)
+    //   2. Clamp the along-axis position so the opening stays inside the wall ends
+    //   3. Rebuild the wall around the new opening position
+    if (selected.userData?.wallId) {
+      const def = wallDefs.find(d => d.id === selected.userData.wallId);
+      if (def) {
+        // Snap to wall plane (lock perpendicular)
+        if (def.axis === 'x') selected.position.y = def.lineCoord;
+        else                  selected.position.x = def.lineCoord;
+        // Clamp along the wall
+        const halfW = (selected.userData.openingW || 0.9) / 2;
+        const minAlong = def.alongStart + halfW + 0.05;
+        const maxAlong = def.alongEnd   - halfW - 0.05;
+        const along = def.axis === 'x' ? selected.position.x : selected.position.y;
+        const clamped = Math.max(minAlong, Math.min(maxAlong, along));
+        if (def.axis === 'x') selected.position.x = clamped;
+        else                  selected.position.y = clamped;
+        if (selectionHelper) selectionHelper.update();
+      }
+      rebuildWallById(selected.userData.wallId);
+    }
     refreshSelectionFields();
-    // Drag end → if the moved object is a door/window linked to a wall, rebuild that wall
-    if (selected.userData?.wallId) rebuildWallById(selected.userData.wallId);
   }
 });
 transform.addEventListener('change', () => {
@@ -1032,7 +1058,7 @@ animate();
 // ========================================================================
 // PERSISTENCE (localStorage auto-save + JSON export/import)
 // ========================================================================
-const STATE_KEY = 'mountain-villa-state-v1';
+const STATE_KEY = 'mountain-villa-state-v2';
 
 function snapshotState() {
   const s = {
