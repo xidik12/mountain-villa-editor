@@ -164,7 +164,9 @@ const params = {
   extWT: 0.20, intWT: 0.15,
   ovh: { n: 0.8, s: 0.8, e: 0.8, w: 1.2 },
   roofThick: 0.10,
-  P4_y: 3.5,   // moved south 0.5m (was 3.0) → strip 1.5m N-S
+  P4_y: 3.5,
+  roofType: 'flat',   // 'flat' | 'hip'
+  parapetH: 0.30,     // height of perimeter parapet on flat roof
 };
 
 function clearAllLayers() {
@@ -410,7 +412,8 @@ function buildVilla() {
   louver  ('W8_WC_S',     8.75,   0, 0.6, 0.6, 1.8, 'y', 'EW_S_south_wall');
 
   // === ROOF ===
-  buildHipRoof();
+  if (p.roofType === 'flat') buildFlatRoof();
+  else buildHipRoof();
 
   // === CEILINGS ===
   // Bedroom strip (master + BR2): y=7..11
@@ -428,7 +431,7 @@ function buildVilla() {
   // Bath (2×2) and WC (1.5×2) — flat at +2.6
   soloBox('Ceil_Bath',      'Ceilings', [7.0, 1.0, 2.60], [1.825, 1.825, 0.04], M.int);
   soloBox('Ceil_WC',        'Ceilings', [8.75, 1.0, 2.60], [1.325, 1.825, 0.04], M.int);
-  buildVault();
+  if (params.roofType === 'hip') buildVault();
 
   // === TRIM ===
   soloBox('Beam_S', 'Trim_Eaves', [cx, 0,        p.wallTopZ + 0.02], [p.envX + 0.2, 0.25, 0.04], M.trim);
@@ -440,6 +443,33 @@ function buildVilla() {
 
   // Now that all openings exist, generate wall segments around them.
   rebuildAllWalls();
+}
+
+function buildFlatRoof() {
+  const p = params;
+  const ovh = p.ovh;
+  const xMin = -ovh.w, xMax = p.envX + ovh.e;
+  const yMin = -ovh.s, yMax = p.envY + ovh.n;
+  const cx = (xMin + xMax) / 2, cy = (yMin + yMax) / 2;
+  const w = xMax - xMin, d = yMax - yMin;
+  const baseZ = p.wallTopZ + 0.10;
+  const slabT = 0.20;
+  const parapetH = p.parapetH;
+  const parapetT = 0.10;
+  const a = assembly('Roof_main', 'Roof');
+  partBox(a, '_slab', [cx, cy, baseZ + slabT/2], [w, d, slabT], M.roof);
+  // perimeter parapet — capped on the slab so the roof looks finished
+  const pTop = baseZ + slabT + parapetH / 2;
+  partBox(a, '_parapet_S', [cx, yMin + parapetT/2, pTop], [w, parapetT, parapetH], M.ext);
+  partBox(a, '_parapet_N', [cx, yMax - parapetT/2, pTop], [w, parapetT, parapetH], M.ext);
+  partBox(a, '_parapet_W', [xMin + parapetT/2, cy, pTop], [parapetT, d - 2*parapetT, parapetH], M.ext);
+  partBox(a, '_parapet_E', [xMax - parapetT/2, cy, pTop], [parapetT, d - 2*parapetT, parapetH], M.ext);
+  // White cap on top of parapet (concrete coping)
+  partBox(a, '_coping_S', [cx, yMin + parapetT/2, baseZ + slabT + parapetH + 0.025], [w + 0.04, parapetT + 0.04, 0.05], M.trim);
+  partBox(a, '_coping_N', [cx, yMax - parapetT/2, baseZ + slabT + parapetH + 0.025], [w + 0.04, parapetT + 0.04, 0.05], M.trim);
+  partBox(a, '_coping_W', [xMin + parapetT/2, cy, baseZ + slabT + parapetH + 0.025], [parapetT + 0.04, d - 2*parapetT + 0.04, 0.05], M.trim);
+  partBox(a, '_coping_E', [xMax - parapetT/2, cy, baseZ + slabT + parapetH + 0.025], [parapetT + 0.04, d - 2*parapetT + 0.04, 0.05], M.trim);
+  setAnchor(a, cx, cy, baseZ + slabT/2);
 }
 
 function buildHipRoof() {
@@ -956,6 +986,7 @@ document.getElementById('rebuild').addEventListener('click', () => {
   params.envY = parseFloat(document.getElementById('envY').value);
   params.wallTopZ = parseFloat(document.getElementById('wallTopZ').value);
   params.peakZ = parseFloat(document.getElementById('peakZ').value);
+  params.roofType = document.getElementById('roofType').value;
   setSelected(null);
   buildVilla();
   buildSidebar();
