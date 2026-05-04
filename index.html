@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mountain Villa Editor</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="viewport"></canvas>
+
+    <aside id="sidebar">
+      <h1>🏡 Mountain Villa</h1>
+      <p class="muted">9.5 × 11 m · drag the canvas to orbit · scroll to zoom · right-drag to pan</p>
+
+      <section>
+        <h2>View</h2>
+        <div class="row"><button id="cam-orbit" class="full">Free Orbit</button></div>
+        <div id="cameras"></div>
+        <div class="row">
+          <label class="inline"><input type="checkbox" id="cam-ortho"> Orthographic</label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Layers</h2>
+        <div id="layers"></div>
+      </section>
+
+      <section>
+        <h2>Selection</h2>
+        <div id="selection">
+          <em class="muted">Click any object to select</em>
+        </div>
+        <div class="row mode-row">
+          <button data-mode="translate" class="mode active">Move (G)</button>
+          <button data-mode="rotate" class="mode">Rotate (R)</button>
+          <button data-mode="scale" class="mode">Scale (S)</button>
+        </div>
+        <div class="row">
+          <button id="deselect" class="full">Deselect (Esc)</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Dimensions</h2>
+        <label>Envelope X (m, E-W) <input id="envX" type="number" step="0.1" value="9.5"></label>
+        <label>Envelope Y (m, N-S) <input id="envY" type="number" step="0.1" value="11"></label>
+        <label>Wall top Z (m) <input id="wallTopZ" type="number" step="0.05" value="3.25"></label>
+        <label>Roof peak Z (m) <input id="peakZ" type="number" step="0.05" value="5.45"></label>
+        <div class="row"><button id="rebuild" class="full primary">Apply (rebuild)</button></div>
+      </section>
+
+      <section>
+        <h2>File</h2>
+        <p class="muted small">Edits auto-save to your browser. Export as JSON to share or back up.</p>
+        <div class="row"><button id="file-save" class="full">⬇ Download JSON</button></div>
+        <div class="row"><button id="file-load" class="full">⬆ Load JSON</button></div>
+        <div class="row"><button id="file-reset" class="full danger">↺ Reset to defaults</button></div>
+      </section>
+
+      <section>
+        <h2>Help</h2>
+        <p class="muted small">
+          Click an object → gizmo appears.<br>
+          Press <b>G</b> / <b>R</b> / <b>S</b> while selected to switch move/rotate/scale.<br>
+          Press <b>X</b> / <b>Y</b> / <b>Z</b> to constrain to one axis.<br>
+          Press <b>Esc</b> or click background to deselect.
+        </p>
+      </section>
+    </aside>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

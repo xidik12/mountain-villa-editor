@@ -1,0 +1,1171 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+// ========================================================================
+// 9.5 × 11 envelope (Plan A) · ONLY DELTA from prior version:
+// dining-E strip widened from 1.0 m to 1.5 m N-S → P5 at y=1.5 (was 2.0)
+// Bath/WC zone shrinks from y=0..2 to y=0..1.5 to accommodate.
+// ========================================================================
+
+const sidebarWidth = () => 320;
+const viewW = () => window.innerWidth - sidebarWidth();
+const viewH = () => window.innerHeight;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9CB3D1);
+scene.fog = new THREE.Fog(0x9CB3D1, 60, 200);
+
+let camera = new THREE.PerspectiveCamera(40, viewW() / viewH(), 0.1, 500);
+camera.up.set(0, 0, 1);
+camera.position.set(20, -16, 12);
+
+const renderer = new THREE.WebGLRenderer({
+  canvas: document.getElementById('viewport'),
+  antialias: true,
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(viewW(), viewH());
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.target.set(4.75, 5.5, 1.5);
+orbit.enableDamping = true;
+orbit.dampingFactor = 0.08;
+orbit.maxPolarAngle = Math.PI * 0.49;
+orbit.minDistance = 2;
+orbit.maxDistance = 80;
+
+// === LIGHTING ===
+const sun = new THREE.DirectionalLight(0xfff0d0, 2.2);
+sun.position.set(-12, -6, 16);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 60;
+sun.shadow.camera.left = -25;
+sun.shadow.camera.right = 25;
+sun.shadow.camera.top = 25;
+sun.shadow.camera.bottom = -25;
+sun.shadow.bias = -0.0005;
+sun.target.position.set(4.75, 5.5, 0);
+scene.add(sun);
+scene.add(sun.target);
+scene.add(new THREE.HemisphereLight(0xb6d3ff, 0x4d5b3d, 0.55));
+scene.add(new THREE.AmbientLight(0xffffff, 0.18));
+
+// === MATERIALS ===
+const hex = (h) => new THREE.Color(h);
+const M = {
+  ext:    new THREE.MeshStandardMaterial({ color: hex(0xD9C7A7), roughness: 0.85 }),
+  plinth: new THREE.MeshStandardMaterial({ color: hex(0x5A5754), roughness: 0.85 }),
+  roof:   new THREE.MeshStandardMaterial({ color: hex(0x2E2E2E), roughness: 0.45, metalness: 0.45 }),
+  trim:   new THREE.MeshStandardMaterial({ color: hex(0xFAFAFA), roughness: 0.55 }),
+  int:    new THREE.MeshStandardMaterial({ color: hex(0xF5F2EC), roughness: 0.7 }),
+  batten: new THREE.MeshStandardMaterial({ color: hex(0x8B5A2B), roughness: 0.6 }),
+  floor:  new THREE.MeshStandardMaterial({ color: hex(0xC9B898), roughness: 0.4 }),
+  wet:    new THREE.MeshStandardMaterial({ color: hex(0x8C8C8C), roughness: 0.4 }),
+  wt:     new THREE.MeshStandardMaterial({ color: hex(0xB8B8B0), roughness: 0.3 }),
+  wood:   new THREE.MeshStandardMaterial({ color: hex(0xA0703B), roughness: 0.5 }),
+  alu:    new THREE.MeshStandardMaterial({ color: hex(0x3A3A3A), roughness: 0.4, metalness: 0.7 }),
+  glass:  new THREE.MeshStandardMaterial({ color: hex(0xAECEE0), roughness: 0.05, transparent: true, opacity: 0.30 }),
+  grass:  new THREE.MeshStandardMaterial({ color: hex(0x4F6F38), roughness: 0.95 }),
+  paving: new THREE.MeshStandardMaterial({ color: hex(0x8C7A65), roughness: 0.85 }),
+  gravel: new THREE.MeshStandardMaterial({ color: hex(0x9D9285), roughness: 0.95 }),
+  fabric: new THREE.MeshStandardMaterial({ color: hex(0xC8B690), roughness: 0.9 }),
+  bedding:new THREE.MeshStandardMaterial({ color: hex(0xEAE4D8), roughness: 0.85 }),
+  pillow: new THREE.MeshStandardMaterial({ color: hex(0xF8F4EE), roughness: 0.9 }),
+  counter:new THREE.MeshStandardMaterial({ color: hex(0x6B4423), roughness: 0.5 }),
+  porc:   new THREE.MeshStandardMaterial({ color: hex(0xF8F8F6), roughness: 0.15 }),
+  chrome: new THREE.MeshStandardMaterial({ color: hex(0xD8D8DA), roughness: 0.15, metalness: 0.95 }),
+  metal:  new THREE.MeshStandardMaterial({ color: hex(0x4D4D50), roughness: 0.4, metalness: 0.7 }),
+  rug:    new THREE.MeshStandardMaterial({ color: hex(0x8C5642), roughness: 0.95 }),
+  mountain:new THREE.MeshStandardMaterial({ color: hex(0x4F5C68), roughness: 0.95 }),
+};
+
+// === LAYERS ===
+const LAYER_NAMES = [
+  'Site', 'Foundation',
+  'Walls_Exterior', 'Walls_Interior',
+  'Trim_Eaves', 'Roof', 'Ceilings',
+  'Doors', 'Windows',
+  'Furniture_Master', 'Furniture_BR2', 'Furniture_BR1',
+  'Furniture_Dining', 'Furniture_Kitchen',
+  'Furniture_Bath', 'Furniture_WC',
+  'Lighting_Fixtures',
+];
+const layers = {};
+LAYER_NAMES.forEach(n => {
+  const g = new THREE.Group();
+  g.name = n;
+  layers[n] = g;
+  scene.add(g);
+});
+
+// === HELPERS ===
+function assembly(name, layerName) {
+  const g = new THREE.Group();
+  g.name = name;
+  g.userData = { isAssembly: true, layer: layerName };
+  layers[layerName].add(g);
+  return g;
+}
+function partBox(parent, suffix, pos, size, mat) {
+  const geo = new THREE.BoxGeometry(size[0], size[1], size[2]);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(pos[0], pos[1], pos[2]);
+  mesh.name = parent.name + suffix;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+function partCyl(parent, suffix, pos, r, h, mat, axis = 'z') {
+  const geo = new THREE.CylinderGeometry(r, r, h, 24);
+  const mesh = new THREE.Mesh(geo, mat);
+  if (axis === 'z') mesh.rotation.x = Math.PI / 2;
+  else if (axis === 'x') mesh.rotation.z = Math.PI / 2;
+  mesh.position.set(pos[0], pos[1], pos[2]);
+  mesh.name = parent.name + suffix;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+function soloBox(name, layerName, pos, size, mat) {
+  const a = assembly(name, layerName);
+  partBox(a, '', pos, size, mat);
+  return a;
+}
+
+// === PARAMS (per plan-A-plumbing.svg: 9.5 × 11, dining-E strip 1.5 m thick) ===
+const params = {
+  envX: 9.5, envY: 11.0,
+  wallTopZ: 3.25, wallBtmZ: 0.45,
+  peakZ: 5.45, ridgeY: 5.5,
+  ridgeXfromW: 1.4, ridgeXfromE: 1.4,
+  extWT: 0.20, intWT: 0.15,
+  ovh: { n: 0.8, s: 0.8, e: 0.8, w: 1.2 },
+  roofThick: 0.10,
+  P4_y: 3.5,   // moved south 0.5m (was 3.0) → strip 1.5m N-S
+};
+
+function clearAllLayers() {
+  Object.values(layers).forEach(g => {
+    while (g.children.length) {
+      const c = g.children[0];
+      g.remove(c);
+      c.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    }
+  });
+}
+
+// ========================================================================
+// VILLA BUILDER (9.5 × 11 — prior layout with strip-width tweak)
+// ========================================================================
+function buildVilla() {
+  clearAllLayers();
+  const p = params;
+  const FFL = p.wallBtmZ;
+  const cx = p.envX / 2;
+  const cy = p.envY / 2;
+
+  // === SITE ===
+  soloBox('Ground',      'Site', [cx, cy, -0.05], [40, 30, 0.1], M.grass);
+  soloBox('FrontPaving', 'Site', [p.envX + 5, cy, 0.005], [4, 9, 0.01], M.paving);
+  soloBox('Driveway',    'Site', [p.envX + 8, cy, 0], [4, 6, 0.01], M.gravel);
+  soloBox('Mountain_W',  'Site', [-25, cy, 8], [10, 30, 16], M.mountain);
+  soloBox('Mountain_SW', 'Site', [-30, -5, 6], [8, 15, 12], M.mountain);
+  soloBox('Mountain_NW', 'Site', [-30, p.envY + 5, 7], [8, 15, 14], M.mountain);
+
+  // === FOUNDATION ===
+  soloBox('FloorSlab', 'Foundation', [cx, cy, 0.40], [p.envX + 0.2, p.envY + 0.2, 0.10], M.floor);
+  soloBox('Plinth_S',  'Foundation', [cx, -0.075, 0.25], [p.envX + 0.3, 0.05, 0.40], M.plinth);
+  soloBox('Plinth_N',  'Foundation', [cx, p.envY + 0.075, 0.25], [p.envX + 0.3, 0.05, 0.40], M.plinth);
+  soloBox('Plinth_W',  'Foundation', [-0.075, cy, 0.25], [0.05, p.envY + 0.2, 0.40], M.plinth);
+  soloBox('Plinth_E',  'Foundation', [p.envX + 0.075, cy, 0.25], [0.05, p.envY + 0.2, 0.40], M.plinth);
+  // Wet floor overlays — Bath at (6-8, 0-2), WC at (8-9.5, 0-2)
+  soloBox('FloorTile_Bath', 'Foundation', [7.0,  1.0, 0.4525], [1.825, 1.825, 0.005], M.wet);
+  soloBox('FloorTile_WC',   'Foundation', [8.75, 1.0, 0.4525], [1.325, 1.825, 0.005], M.wet);
+
+  // === WALLS WITH OPENINGS ===
+  const wallTop = p.wallTopZ, wallBot = p.wallBtmZ;
+  const doorTop = wallBot + 2.1;
+
+  function buildWall(name, layer, axis, lineCoord, alongStart, alongEnd, thickness, mat, openings) {
+    const a = assembly(name, layer);
+    const sorted = [...openings].sort((x, y) => x.c - y.c);
+    let prev = alongStart;
+    function addSeg(alongCenter, alongLen, zCenter, zHeight) {
+      if (alongLen < 0.001 || zHeight < 0.001) return;
+      const pos = axis === 'x'
+        ? [alongCenter, lineCoord, zCenter]
+        : [lineCoord, alongCenter, zCenter];
+      const size = axis === 'x'
+        ? [alongLen, thickness, zHeight]
+        : [thickness, alongLen, zHeight];
+      partBox(a, `_seg_${alongCenter.toFixed(2)}_${zCenter.toFixed(2)}`, pos, size, mat);
+    }
+    for (const op of sorted) {
+      const opStart = op.c - op.w / 2;
+      const opEnd   = op.c + op.w / 2;
+      if (opStart > prev + 0.001) {
+        addSeg((prev + opStart) / 2, opStart - prev, (wallBot + wallTop) / 2, wallTop - wallBot);
+      }
+      if (op.sill > wallBot + 0.001) {
+        addSeg(op.c, op.w, (wallBot + op.sill) / 2, op.sill - wallBot);
+      }
+      if (op.top < wallTop - 0.001) {
+        addSeg(op.c, op.w, (op.top + wallTop) / 2, wallTop - op.top);
+      }
+      prev = opEnd;
+    }
+    if (alongEnd > prev + 0.001) {
+      addSeg((prev + alongEnd) / 2, alongEnd - prev, (wallBot + wallTop) / 2, wallTop - wallBot);
+    }
+    return a;
+  }
+
+  // === EXTERIOR WALLS (per plan-A-plumbing.svg layout) ===
+  buildWall('EW_S_south_wall', 'Walls_Exterior', 'x', 0,        -p.extWT/2, p.envX + p.extWT/2, p.extWT, M.ext, [
+    { c: 1.55, w: 1.2, sill: 1.0,    top: 2.2 },              // W6 dining S casement (per SVG)
+    { c: 4.0,  w: 1.5, sill: wallBot, top: doorTop },         // D6 main entry slider
+    { c: 7.0,  w: 0.5, sill: 1.8,    top: 2.4 },              // W7 bath S frosted
+    { c: 8.75, w: 0.6, sill: 1.8,    top: 2.4 },              // W8 WC S frosted
+  ]);
+  buildWall('EW_N_north_wall', 'Walls_Exterior', 'x', p.envY,   -p.extWT/2, p.envX + p.extWT/2, p.extWT, M.ext, []);
+  buildWall('EW_W_west_wall',  'Walls_Exterior', 'y', 0,        -p.extWT/2, p.envY + p.extWT/2, p.extWT, M.ext, [
+    { c: 9.0, w: 1.5, sill: 1.0, top: 2.2 },                  // W1 master W
+    { c: 5.0, w: 2.5, sill: 1.0, top: 2.5 },                  // W4 dining big mountain
+    { c: 2.0, w: 2.5, sill: 1.0, top: 2.5 },                  // W5 dining big mountain
+  ]);
+  buildWall('EW_E_east_wall',  'Walls_Exterior', 'y', p.envX,   -p.extWT/2, p.envY + p.extWT/2, p.extWT, M.ext, [
+    { c: 2.5, w: 0.9, sill: wallBot, top: doorTop },          // D7 service
+    { c: 5.0, w: 1.5, sill: 1.0,     top: 2.2 },              // W3 BR1 E
+    { c: 9.0, w: 1.5, sill: 1.0,     top: 2.2 },              // W2 BR2 E
+  ]);
+
+  // === INTERIOR PARTITIONS (7) ===
+  // P1: x=4, y=7→11 (Master/BR2)
+  buildWall('P1_master_BR2',        'Walls_Interior', 'y', 4,    7,         11,         p.intWT, M.int, []);
+  // P2: y=7, x=0→9.5 (long horizontal — bedrooms/dining)
+  buildWall('P2_bedrooms_dining',   'Walls_Interior', 'x', 7,    0,         p.envX,     p.intWT, M.int, [
+    { c: 2.0,  w: 0.9, sill: wallBot, top: doorTop },  // D1 master
+    { c: 4.75, w: 0.9, sill: wallBot, top: doorTop },  // D2 BR2
+  ]);
+  // P3: x=5.5, y=P4_y→7 (dining/BR1) — length now 3.5m (was 4m)
+  buildWall('P3_dining_BR1',        'Walls_Interior', 'y', 5.5,  p.P4_y,    7,          p.intWT, M.int, [
+    { c: 6.35, w: 0.9, sill: wallBot, top: doorTop },  // D3 BR1
+  ]);
+  // P4: y=P4_y (3.5), x=5.5→9.5 (BR1/dining-E strip) — moved south 0.5m
+  buildWall('P4_BR1_diningEstrip',  'Walls_Interior', 'x', p.P4_y, 5.5,     p.envX,     p.intWT, M.int, []);
+  // P5: y=2, x=6→9.5 (dining-E strip / wet zone)
+  buildWall('P5_diningEstrip_wet',  'Walls_Interior', 'x', 2,    6,         p.envX,     p.intWT, M.int, [
+    { c: 7.0,  w: 0.8, sill: wallBot, top: doorTop },  // D4 bath
+    { c: 8.75, w: 0.7, sill: wallBot, top: doorTop },  // D5 WC
+  ]);
+  // P6: x=6, y=0→2 (kitchen/bath west)
+  buildWall('P6_kitchen_bath',      'Walls_Interior', 'y', 6,    0,         2,          p.intWT, M.int, []);
+  // P7: x=8, y=0→2 (bath/WC)
+  buildWall('P7_bath_WC',           'Walls_Interior', 'y', 8,    0,         2,          p.intWT, M.int, []);
+
+  // === DOORS (visible meshes — sit in the wall holes) ===
+  function door(name, x, y, w, h, dirn, leafMat) {
+    const a = assembly(name, 'Doors');
+    const z = FFL + h / 2;
+    const fw = 0.08, fd = 0.12;
+    if (dirn === 'y') {
+      partBox(a, '_FrL', [x - w/2 - fw/2, y, z], [fw, fd, h + fw], M.trim);
+      partBox(a, '_FrR', [x + w/2 + fw/2, y, z], [fw, fd, h + fw], M.trim);
+      partBox(a, '_FrT', [x, y, FFL + h + fw/2], [w + 2*fw, fd, fw], M.trim);
+      partBox(a, '_Leaf', [x, y, z], [w - 0.02, 0.04, h - 0.02], leafMat);
+      partBox(a, '_Knob', [x + w/2 - 0.1, y + 0.06, FFL + 1.0], [0.04, 0.03, 0.04], M.alu);
+    } else {
+      partBox(a, '_FrL', [x, y - w/2 - fw/2, z], [fd, fw, h + fw], M.trim);
+      partBox(a, '_FrR', [x, y + w/2 + fw/2, z], [fd, fw, h + fw], M.trim);
+      partBox(a, '_FrT', [x, y, FFL + h + fw/2], [fd, w + 2*fw, fw], M.trim);
+      partBox(a, '_Leaf', [x, y, z], [0.04, w - 0.02, h - 0.02], leafMat);
+      partBox(a, '_Knob', [x + 0.06, y + w/2 - 0.1, FFL + 1.0], [0.03, 0.04, 0.04], M.alu);
+    }
+    return a;
+  }
+  function slider(name, x, y, w, h, dirn) {
+    const a = assembly(name, 'Doors');
+    const z = FFL + h / 2;
+    if (dirn === 'y') {
+      partBox(a, '_TopRail', [x, y, FFL + h - 0.04], [w + 0.16, 0.10, 0.08], M.alu);
+      partBox(a, '_BotRail', [x, y, FFL + 0.04],     [w + 0.16, 0.10, 0.08], M.alu);
+      partBox(a, '_LJamb', [x - w/2 - 0.04, y, z], [0.08, 0.10, h], M.alu);
+      partBox(a, '_RJamb', [x + w/2 + 0.04, y, z], [0.08, 0.10, h], M.alu);
+      partBox(a, '_GlassL', [x - w/4, y, z], [w/2 - 0.05, 0.025, h - 0.10], M.glass);
+      partBox(a, '_GlassR', [x + w/4, y, z], [w/2 - 0.05, 0.025, h - 0.10], M.glass);
+      partBox(a, '_Handle', [x, y + 0.07, z], [0.20, 0.02, 0.03], M.alu);
+    } else {
+      // dirn = 'x' (east-wall slider)
+      partBox(a, '_TopRail', [x, y, FFL + h - 0.04], [0.10, w + 0.16, 0.08], M.alu);
+      partBox(a, '_BotRail', [x, y, FFL + 0.04],     [0.10, w + 0.16, 0.08], M.alu);
+      partBox(a, '_LJamb', [x, y - w/2 - 0.04, z], [0.10, 0.08, h], M.alu);
+      partBox(a, '_RJamb', [x, y + w/2 + 0.04, z], [0.10, 0.08, h], M.alu);
+      partBox(a, '_GlassL', [x, y - w/4, z], [0.025, w/2 - 0.05, h - 0.10], M.glass);
+      partBox(a, '_GlassR', [x, y + w/4, z], [0.025, w/2 - 0.05, h - 0.10], M.glass);
+      partBox(a, '_Handle', [x + 0.07, y, z], [0.02, 0.20, 0.03], M.alu);
+    }
+    return a;
+  }
+
+  // Door schedule per plumbing.svg
+  door('D1_master_door',  2.0,   7.0, 0.9, 2.1, 'y', M.wood);
+  door('D2_BR2_door',     4.75,  7.0, 0.9, 2.1, 'y', M.wood);
+  door('D3_BR1_door',     5.5,   6.35, 0.9, 2.1, 'x', M.wood);
+  door('D4_bath_door',    7.0,   2.0, 0.8, 2.1, 'y', M.trim);
+  door('D5_WC_door',      8.75,  2.0, 0.7, 2.1, 'y', M.trim);
+  door('D7_service_door', p.envX, 2.5, 0.9, 2.1, 'x', M.wood);
+  slider('D6_main_entry', 4.0, 0, 1.5, 2.1, 'y');
+
+  // === WINDOWS ===
+  function casement(name, x, y, w, h, sill, dirn) {
+    const a = assembly(name, 'Windows');
+    const z = sill + h / 2;
+    const fw = 0.05, fd = 0.08;
+    if (dirn === 'y') {
+      partBox(a, '_FrT', [x, y, sill + h + fw/2], [w + 2*fw, fd, fw], M.alu);
+      partBox(a, '_FrB', [x, y, sill - fw/2],     [w + 2*fw, fd, fw], M.alu);
+      partBox(a, '_FrL', [x - w/2 - fw/2, y, z], [fw, fd, h], M.alu);
+      partBox(a, '_FrR', [x + w/2 + fw/2, y, z], [fw, fd, h], M.alu);
+      if (w >= 1.0) partBox(a, '_Mull', [x, y, z], [fw, fd, h], M.alu);
+      partBox(a, '_Glass', [x, y, z], [w - 0.04, 0.025, h - 0.04], M.glass);
+      partBox(a, '_Sill', [x, y - 0.06, sill - 0.06], [w + 0.18, 0.20, 0.06], M.plinth);
+    } else {
+      partBox(a, '_FrT', [x, y, sill + h + fw/2], [fd, w + 2*fw, fw], M.alu);
+      partBox(a, '_FrB', [x, y, sill - fw/2],     [fd, w + 2*fw, fw], M.alu);
+      partBox(a, '_FrL', [x, y - w/2 - fw/2, z], [fd, fw, h], M.alu);
+      partBox(a, '_FrR', [x, y + w/2 + fw/2, z], [fd, fw, h], M.alu);
+      if (w >= 1.0) partBox(a, '_Mull', [x, y, z], [fd, fw, h], M.alu);
+      partBox(a, '_Glass', [x, y, z], [0.025, w - 0.04, h - 0.04], M.glass);
+      const off = x < cx ? -0.06 : 0.06;
+      partBox(a, '_Sill', [x + off, y, sill - 0.06], [0.20, w + 0.18, 0.06], M.plinth);
+    }
+    return a;
+  }
+  function louver(name, x, y, w, h, sill, dirn) {
+    const a = assembly(name, 'Windows');
+    const z = sill + h / 2;
+    const fw = 0.04, fd = 0.06;
+    if (dirn === 'y') {
+      partBox(a, '_FrT', [x, y, sill + h + fw/2], [w + 2*fw, fd, fw], M.trim);
+      partBox(a, '_FrB', [x, y, sill - fw/2],     [w + 2*fw, fd, fw], M.trim);
+      partBox(a, '_FrL', [x - w/2 - fw/2, y, z], [fw, fd, h], M.trim);
+      partBox(a, '_FrR', [x + w/2 + fw/2, y, z], [fw, fd, h], M.trim);
+      const slatH = h / 4;
+      for (let i = 0; i < 4; i++) {
+        partBox(a, `_S${i}`, [x, y - 0.01, sill + slatH * i + slatH / 2], [w - 0.02, 0.04, slatH * 0.85], M.trim);
+      }
+      partBox(a, '_Sill', [x, y - 0.06, sill - 0.04], [w + 0.16, 0.16, 0.06], M.plinth);
+    }
+    return a;
+  }
+
+  // Window schedule per plumbing.svg
+  casement('W1_master_W', 0,      9, 1.5, 1.2, 1.0, 'x');
+  casement('W2_BR2_E',    p.envX, 9, 1.5, 1.2, 1.0, 'x');
+  casement('W3_BR1_E',    p.envX, 5, 1.5, 1.2, 1.0, 'x');
+  casement('W4_dining_W', 0,      5, 2.5, 1.5, 1.0, 'x');
+  casement('W5_dining_W', 0,      2, 2.5, 1.5, 1.0, 'x');
+  casement('W6_dining_S', 1.55,   0, 1.2, 1.2, 1.0, 'y');
+  louver  ('W7_bath_S',   7.0,    0, 0.5, 0.6, 1.8, 'y');
+  louver  ('W8_WC_S',     8.75,   0, 0.6, 0.6, 1.8, 'y');
+
+  // === ROOF ===
+  buildHipRoof();
+
+  // === CEILINGS ===
+  // Bedroom strip (master + BR2): y=7..11
+  soloBox('Ceil_Bedrooms',  'Ceilings', [cx, 9.0, 3.15], [p.envX, 4.0, 0.04], M.int);
+  // BR1: x=5.5..9.5 (4m), y=P4_y..7 (3.5m if P4_y=3.5)
+  const br1y = (p.P4_y + 7) / 2;
+  const br1h = 7 - p.P4_y;
+  soloBox('Ceil_BR1',       'Ceilings', [7.5, br1y, 3.15], [4.0, br1h, 0.04], M.int);
+  // Dining-E strip: x=6..9.5 (3.5m), y=2..P4_y (1.5m if P4_y=3.5)
+  const stripY = (2 + p.P4_y) / 2;
+  const stripH = p.P4_y - 2;
+  soloBox('Ceil_DiningEstrip','Ceilings', [7.75, stripY, 3.15], [3.5, stripH, 0.04], M.int);
+  // Dining-NW under west hip slope: x=0..1.4
+  soloBox('Ceil_Dining_NW', 'Ceilings', [0.7, 3.5, 3.15], [1.4, 7.0, 0.04], M.int);
+  // Bath (2×2) and WC (1.5×2) — flat at +2.6
+  soloBox('Ceil_Bath',      'Ceilings', [7.0, 1.0, 2.60], [1.825, 1.825, 0.04], M.int);
+  soloBox('Ceil_WC',        'Ceilings', [8.75, 1.0, 2.60], [1.325, 1.825, 0.04], M.int);
+  buildVault();
+
+  // === TRIM ===
+  soloBox('Beam_S', 'Trim_Eaves', [cx, 0,        p.wallTopZ + 0.02], [p.envX + 0.2, 0.25, 0.04], M.trim);
+  soloBox('Beam_N', 'Trim_Eaves', [cx, p.envY,   p.wallTopZ + 0.02], [p.envX + 0.2, 0.25, 0.04], M.trim);
+  soloBox('Beam_W', 'Trim_Eaves', [0, cy,        p.wallTopZ + 0.02], [0.25, p.envY + 0.2, 0.04], M.trim);
+  soloBox('Beam_E', 'Trim_Eaves', [p.envX, cy,   p.wallTopZ + 0.02], [0.25, p.envY + 0.2, 0.04], M.trim);
+
+  buildFurniture();
+}
+
+function buildHipRoof() {
+  const p = params;
+  const ovh = p.ovh;
+  const eaveTop = p.wallTopZ + 0.10;
+  const eaveBot = p.wallTopZ;
+  const peakTop = p.peakZ + 0.10;
+  const peakBot = p.peakZ;
+  const rxW = p.ridgeXfromW;
+  const rxE = p.envX - p.ridgeXfromE;
+  const ry = p.ridgeY;
+
+  const top = [
+    [-ovh.w, -ovh.s, eaveTop],
+    [p.envX + ovh.e, -ovh.s, eaveTop],
+    [p.envX + ovh.e, p.envY + ovh.n, eaveTop],
+    [-ovh.w, p.envY + ovh.n, eaveTop],
+    [rxW, ry, peakTop],
+    [rxE, ry, peakTop],
+  ];
+  const bot = [
+    [-ovh.w, -ovh.s, eaveBot],
+    [p.envX + ovh.e, -ovh.s, eaveBot],
+    [p.envX + ovh.e, p.envY + ovh.n, eaveBot],
+    [-ovh.w, p.envY + ovh.n, eaveBot],
+    [rxW, ry, peakBot],
+    [rxE, ry, peakBot],
+  ];
+  const topFaces = [[0,1,5,4],[2,3,4,5],[3,0,4],[1,2,5]];
+  const botFaces = [[0,4,5,1],[2,5,4,3],[3,4,0],[1,5,2]];
+  const edgeFaces = [[0,1],[1,2],[2,3],[3,0]];
+  const verts = [], indices = [];
+  top.forEach(v => verts.push(...v));
+  bot.forEach(v => verts.push(...v));
+  const offBot = top.length;
+  const pushFace = (f, off=0) => {
+    if (f.length === 3) indices.push(f[0]+off, f[1]+off, f[2]+off);
+    else { indices.push(f[0]+off, f[1]+off, f[2]+off); indices.push(f[0]+off, f[2]+off, f[3]+off); }
+  };
+  topFaces.forEach(f => pushFace(f, 0));
+  botFaces.forEach(f => pushFace(f, offBot));
+  edgeFaces.forEach(([a,b]) => {
+    indices.push(a, offBot+a, offBot+b);
+    indices.push(a, offBot+b, b);
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+
+  const a = assembly('Roof_main', 'Roof');
+  const m = new THREE.Mesh(geo, M.roof);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  m.name = 'Roof_main_shell';
+  a.add(m);
+  partBox(a, '_ridge_cap', [(rxW + rxE)/2, ry, peakTop + 0.04], [rxE - rxW + 0.2, 0.18, 0.08], M.roof);
+}
+
+function buildVault() {
+  // Per spec §10: dining vault peaks at +5.30 (ridge level), eave at +3.20
+  const peakV = 5.30, eaveV = 3.20;
+  const xMin = 1.4, xMax = 5.5;   // constrained to ridge x-range so it stays below the hipped roof slopes
+  function make(name, vs) {
+    const verts = [];
+    vs.forEach(v => verts.push(...v));
+    const idx = [0, 1, 2, 0, 2, 3];
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    const a = assembly(name, 'Ceilings');
+    const m = new THREE.Mesh(g, M.batten);
+    m.name = name + '_face';
+    a.add(m);
+    return a;
+  }
+  make('Ceil_Vault_S', [[xMin, 0, eaveV], [xMax, 0, eaveV], [xMax, 5.5, peakV], [xMin, 5.5, peakV]]);
+  const zN = peakV - 1.5 * ((peakV - eaveV) / 5.5);
+  make('Ceil_Vault_N', [[xMin, 5.5, peakV], [xMax, 5.5, peakV], [xMax, 7, zN], [xMin, 7, zN]]);
+}
+
+// ========================================================================
+// FURNITURE (prior 9.5×11 layout)
+// ========================================================================
+function buildFurniture() {
+  const FFL = params.wallBtmZ;
+
+  function bed(name, cx, cy, headDir, layer) {
+    const a = assembly(name, layer);
+    const L = (headDir === 'north' || headDir === 'south') ? 1.6 : 2.0;
+    const W = (headDir === 'north' || headDir === 'south') ? 2.0 : 1.6;
+    partBox(a, '_frame',    [cx, cy, FFL + 0.18], [L + 0.05, W + 0.05, 0.30], M.wood);
+    partBox(a, '_mattress', [cx, cy, FFL + 0.45], [L - 0.05, W - 0.05, 0.20], M.bedding);
+    if (headDir === 'north') {
+      partBox(a, '_headboard', [cx, cy + W/2 - 0.02, FFL + 0.55], [L + 0.05, 0.06, 1.10], M.wood);
+      partBox(a, '_pillow1',   [cx - 0.35, cy + W/2 - 0.40, FFL + 0.59], [0.55, 0.30, 0.10], M.pillow);
+      partBox(a, '_pillow2',   [cx + 0.35, cy + W/2 - 0.40, FFL + 0.59], [0.55, 0.30, 0.10], M.pillow);
+      partBox(a, '_duvet',     [cx, cy - 0.30, FFL + 0.57], [L - 0.10, W - 0.7, 0.04], M.bedding);
+    } else if (headDir === 'west') {
+      partBox(a, '_headboard', [cx - L/2 + 0.02, cy, FFL + 0.55], [0.06, W + 0.05, 1.10], M.wood);
+      partBox(a, '_pillow1',   [cx - L/2 + 0.40, cy - 0.35, FFL + 0.59], [0.30, 0.55, 0.10], M.pillow);
+      partBox(a, '_pillow2',   [cx - L/2 + 0.40, cy + 0.35, FFL + 0.59], [0.30, 0.55, 0.10], M.pillow);
+      partBox(a, '_duvet',     [cx + 0.30, cy, FFL + 0.57], [L - 0.7, W - 0.10, 0.04], M.bedding);
+    }
+    return a;
+  }
+  function nightstand(name, cx, cy, layer, w = 0.35, d = 0.40, h = 0.60) {
+    return soloBox(name, layer, [cx, cy, FFL + h/2], [w, d, h], M.wood);
+  }
+  function wardrobe(name, cx, cy, layer, w = 2.2, d = 0.55, h = 2.2, axis = 'ew') {
+    const sz = axis === 'ew' ? [w, d, h] : [d, w, h];
+    return soloBox(name, layer, [cx, cy, FFL + h/2], sz, M.wood);
+  }
+  function dresser(name, cx, cy, layer, w = 0.5, d = 0.8, h = 1.0, axis = 'ew') {
+    const sz = axis === 'ns' ? [w, d, h] : [d, w, h];
+    return soloBox(name, layer, [cx, cy, FFL + h/2], sz, M.wood);
+  }
+  function roundChair(name, cx, cy, layer, r = 0.25) {
+    const a = assembly(name, layer);
+    partCyl(a, '_seat', [cx, cy, FFL + 0.42], r, 0.05, M.fabric);
+    partCyl(a, '_back', [cx, cy, FFL + 0.65], r, 0.45, M.fabric);
+    return a;
+  }
+  function fan(name, cx, cy, mountZ = 2.8) {
+    const a = assembly(name, 'Lighting_Fixtures');
+    partCyl(a, '_body', [cx, cy, mountZ + 0.10], 0.10, 0.20, M.alu);
+    for (let i = 0; i < 5; i++) {
+      const ang = i * (2 * Math.PI / 5);
+      const bx = cx + 0.65 * Math.cos(ang);
+      const by = cy + 0.65 * Math.sin(ang);
+      const blade = partBox(a, `_blade${i}`, [bx, by, mountZ + 0.05], [1.20, 0.10, 0.02], M.wood);
+      blade.rotation.z = ang;
+    }
+    return a;
+  }
+  function chair(name, cx, cy, facing, layer) {
+    const a = assembly(name, layer);
+    partBox(a, '_seat', [cx, cy, FFL + 0.45], [0.40, 0.45, 0.05], M.wood);
+    if (facing === 'north') partBox(a, '_back', [cx, cy + 0.20, FFL + 0.70], [0.40, 0.04, 0.40], M.wood);
+    if (facing === 'south') partBox(a, '_back', [cx, cy - 0.20, FFL + 0.70], [0.40, 0.04, 0.40], M.wood);
+    return a;
+  }
+
+  const P4y = params.P4_y;
+
+  // === MASTER (4×4, x=0-4, y=7-11)
+  bed('Master_bed', 2.0, 9.8, 'north', 'Furniture_Master');
+  nightstand('Master_nightstand_L', 1.05, 8.6, 'Furniture_Master');
+  nightstand('Master_nightstand_R', 2.95, 8.6, 'Furniture_Master');
+  wardrobe('Master_wardrobe', 2.0, 7.35, 'Furniture_Master', 2.2, 0.55, 2.2, 'ew');
+  dresser('Master_dresser', 3.65, 8.7, 'Furniture_Master', 0.5, 0.8, 1.0, 'ns');
+  roundChair('Master_reading_chair', 0.5, 9.3, 'Furniture_Master');
+  fan('Master_ceiling_fan', 2.0, 9.0);
+
+  // === BR2 (5.5×4, x=4-9.5, y=7-11)
+  bed('BR2_bed', 6.75, 9.8, 'north', 'Furniture_BR2');
+  nightstand('BR2_nightstand_L', 5.8, 8.6, 'Furniture_BR2');
+  nightstand('BR2_nightstand_R', 7.7, 8.6, 'Furniture_BR2');
+  wardrobe('BR2_wardrobe', 6.75, 7.35, 'Furniture_BR2', 2.2, 0.55, 2.2, 'ew');
+  soloBox('BR2_desk', 'Furniture_BR2', [9.15, 8.7, FFL + 0.36], [0.5, 0.8, 0.72], M.wood);
+  roundChair('BR2_desk_chair', 9.0, 8.0, 'Furniture_BR2');
+  roundChair('BR2_sitting_chair', 4.5, 9.3, 'Furniture_BR2');
+  fan('BR2_ceiling_fan', 6.75, 9.0);
+
+  // === BR1 (4 × 3.5, x=5.5-9.5, y=P4_y..7), bed E-W head W
+  // Centered at ((5.5+9.5)/2, (P4_y+7)/2) = (7.5, ~5.25)
+  const br1cy = (P4y + 7) / 2;
+  bed('BR1_bed', 6.575, br1cy, 'west', 'Furniture_BR1');
+  nightstand('BR1_nightstand', 8.7, P4y + 0.3, 'Furniture_BR1', 0.35, 0.35, 0.6);
+  wardrobe('BR1_wardrobe', 7.5, 6.65, 'Furniture_BR1', 2.2, 0.55, 2.2, 'ew');
+  dresser('BR1_dresser', 9.15, 6.3, 'Furniture_BR1', 0.5, 0.8, 1.0, 'ns');
+  fan('BR1_ceiling_fan', 7.0, br1cy);
+
+  // === DINING (L-shape main rect x=0..5.5, y=0..7)
+  const dt = assembly('Dining_table', 'Furniture_Dining');
+  partBox(dt, '_top', [2.4, 3.1, FFL + 0.74], [2.40, 1.00, 0.04], M.wood);
+  for (const [i, [ox, oy]] of [[-1.10, -0.45], [1.10, -0.45], [-1.10, 0.45], [1.10, 0.45]].entries()) {
+    partBox(dt, `_leg${i}`, [2.4 + ox, 3.1 + oy, FFL + 0.36], [0.06, 0.06, 0.72], M.wood);
+  }
+  for (let i = 0; i < 3; i++) {
+    const x = [1.6, 2.4, 3.2][i];
+    chair(`Dining_chair_N${i+1}`, x, 3.85, 'south', 'Furniture_Dining');
+    chair(`Dining_chair_S${i+1}`, x, 2.35, 'north', 'Furniture_Dining');
+  }
+  soloBox('Dining_sideboard', 'Furniture_Dining', [0.4, 3.5, FFL + 0.45], [0.6, 1.6, 0.90], M.wood);
+  soloBox('Dining_rug', 'Furniture_Dining', [2.4, 3.0, FFL + 0.005], [2.8, 1.8, 0.005], M.rug);
+  const pen = assembly('Dining_pendant', 'Lighting_Fixtures');
+  partCyl(pen, '_cord', [2.4, 3.1, FFL + 2.30], 0.01, 0.80, M.metal);
+  partBox(pen, '_lamp', [2.4, 3.1, FFL + 1.85], [0.70, 0.30, 0.20], M.metal);
+  fan('Dining_ceiling_fan', 4.0, 5.5);
+
+  // === KITCHEN (against bath W wall = P6 inner face x=5.925)
+  const kit = assembly('Kitchen_counter', 'Furniture_Kitchen');
+  partBox(kit, '_base', [5.65, 1.0, FFL + 0.425], [0.6, 1.8, 0.85], M.wood);
+  partBox(kit, '_top',  [5.65, 1.0, FFL + 0.86], [0.62, 1.82, 0.04], M.counter);
+  partBox(kit, '_sink', [5.65, 0.25, FFL + 0.83], [0.50, 0.40, 0.04], M.chrome);
+  partBox(kit, '_stove',[5.65, 1.70, FFL + 0.88], [0.55, 0.55, 0.02], M.alu);
+  soloBox('Kitchen_range_hood', 'Furniture_Kitchen', [5.65, 1.70, FFL + 1.95], [0.62, 0.42, 0.40], M.alu);
+  soloBox('Kitchen_upper_cabinets', 'Furniture_Kitchen', [5.50, 1.0, FFL + 1.85], [0.35, 1.80, 0.70], M.wood);
+  soloBox('Kitchen_fridge', 'Furniture_Kitchen', [4.0, 0.45, FFL + 0.85], [0.6, 0.6, 1.70], M.alu);
+
+  // === BATH (2×2, x=6-8, y=0-2) — shower NE corner
+  const sh = assembly('Bath_shower', 'Furniture_Bath');
+  partBox(sh, '_tray', [7.57, 0.63, FFL + 0.025], [0.78, 0.78, 0.05], M.wt);
+  partBox(sh, '_glassN', [7.57, 1.02, FFL + 1.05], [0.78, 0.01, 2.10], M.glass);
+  partBox(sh, '_glassW', [7.18, 0.63, FFL + 1.05], [0.01, 0.78, 2.10], M.glass);
+  soloBox('Bath_sink', 'Furniture_Bath', [6.275, 0.4, FFL + 0.85], [0.40, 0.50, 0.18], M.porc);
+  soloBox('Bath_mirror', 'Furniture_Bath', [6.10, 0.4, FFL + 1.65], [0.06, 0.50, 0.70], M.alu);
+
+  // === WC (1.5×2, x=8-9.5, y=0-2)
+  const toilet = assembly('WC_toilet', 'Furniture_WC');
+  partBox(toilet, '_tank', [8.75, 0.30, FFL + 0.55], [0.40, 0.20, 0.50], M.porc);
+  partBox(toilet, '_bowl', [8.75, 0.65, FFL + 0.20], [0.40, 0.50, 0.40], M.porc);
+  partBox(toilet, '_seat', [8.75, 0.65, FFL + 0.41], [0.36, 0.46, 0.03], M.porc);
+  soloBox('WC_basin', 'Furniture_WC', [9.275, 1.475, FFL + 0.85], [0.25, 0.35, 0.15], M.porc);
+}
+
+buildVilla();
+
+// ========================================================================
+// SELECTION + UI
+// ========================================================================
+const transform = new TransformControls(camera, renderer.domElement);
+transform.addEventListener('dragging-changed', e => {
+  orbit.enabled = !e.value;
+  if (!e.value && selected) refreshSelectionFields();
+});
+transform.addEventListener('change', () => {
+  if (selected) {
+    refreshSelectionFields();
+    if (selectionHelper) selectionHelper.update();
+  }
+});
+scene.add(transform);
+
+let selected = null;
+let selectionHelper = null;
+
+function findAssembly(obj) {
+  let cur = obj;
+  while (cur && !cur.userData?.isAssembly) cur = cur.parent;
+  return cur;
+}
+
+function setSelected(obj) {
+  if (selectionHelper) {
+    scene.remove(selectionHelper);
+    selectionHelper.geometry.dispose();
+    selectionHelper.material.dispose();
+    selectionHelper = null;
+  }
+  selected = obj;
+  if (obj) {
+    selectionHelper = new THREE.BoxHelper(obj, 0x00aaff);
+    selectionHelper.material.depthTest = false;
+    selectionHelper.renderOrder = 999;
+    scene.add(selectionHelper);
+    transform.attach(obj);
+    showSelection(obj);
+    document.querySelectorAll('.tree-item').forEach(r => r.classList.toggle('active', r.dataset.name === obj.name));
+  } else {
+    transform.detach();
+    document.getElementById('selection').innerHTML = '<em class="muted">Click any object to select</em>';
+    document.querySelectorAll('.tree-item').forEach(r => r.classList.remove('active'));
+  }
+}
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function allMeshes() {
+  const out = [];
+  Object.values(layers).forEach(g => {
+    if (!g.visible) return;
+    g.traverse(o => { if (o.isMesh) out.push(o); });
+  });
+  return out;
+}
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  let moved = false;
+  const startX = e.clientX, startY = e.clientY;
+  const onMove = (m) => { if (Math.abs(m.clientX - startX) + Math.abs(m.clientY - startY) > 4) moved = true; };
+  const onUp = (u) => {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    if (moved) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((u.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((u.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(allMeshes(), false);
+    if (hits.length > 0) {
+      const a = findAssembly(hits[0].object);
+      if (a) setSelected(a);
+    } else {
+      setSelected(null);
+    }
+  };
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+});
+
+const tooltip = document.createElement('div');
+tooltip.id = 'tooltip';
+document.body.appendChild(tooltip);
+
+renderer.domElement.addEventListener('pointermove', (e) => {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(allMeshes(), false);
+  if (hits.length > 0) {
+    const a = findAssembly(hits[0].object);
+    if (a) {
+      tooltip.textContent = `${a.name}  ·  ${a.userData.layer}`;
+      tooltip.style.left = (e.clientX + 12) + 'px';
+      tooltip.style.top  = (e.clientY + 12) + 'px';
+      tooltip.style.display = 'block';
+      return;
+    }
+  }
+  tooltip.style.display = 'none';
+});
+renderer.domElement.addEventListener('pointerleave', () => { tooltip.style.display = 'none'; });
+
+function deleteAssembly(g) {
+  if (selected === g) setSelected(null);
+  g.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  if (g.parent) g.parent.remove(g);
+  buildSidebar();
+}
+
+function buildSidebar() {
+  const layersEl = document.getElementById('layers');
+  // Remember which layers were expanded so refresh doesn't collapse them
+  const wasOpen = new Set();
+  layersEl.querySelectorAll('.layer-block').forEach(blk => {
+    const tree = blk.querySelector('.tree');
+    if (tree && tree.style.display === 'block') {
+      wasOpen.add(blk.querySelector('.lname').textContent);
+    }
+  });
+  layersEl.innerHTML = '';
+  LAYER_NAMES.forEach((name) => {
+    const group = layers[name];
+    const wrap = document.createElement('div');
+    wrap.className = 'layer-block';
+
+    const hdr = document.createElement('div');
+    hdr.className = 'layer-row';
+    hdr.innerHTML = `
+      <input type="checkbox" ${group.visible ? 'checked' : ''} data-layer="${name}">
+      <span class="caret">${wasOpen.has(name) ? '▼' : '▶'}</span>
+      <span class="lname">${name}</span>
+      <span class="count">${group.children.length}</span>
+    `;
+    wrap.appendChild(hdr);
+
+    const tree = document.createElement('div');
+    tree.className = 'tree';
+    tree.style.display = wasOpen.has(name) ? 'block' : 'none';
+    wrap.appendChild(tree);
+
+    group.children.forEach(child => {
+      if (!child.userData?.isAssembly) return;
+      const row = document.createElement('div');
+      row.className = 'tree-item';
+      row.dataset.name = child.name;
+      row.innerHTML = `
+        <button class="ti-vis ${child.visible ? '' : 'hidden'}" title="Toggle visibility">${child.visible ? '●' : '○'}</button>
+        <span class="ti-name">${child.name}</span>
+        <button class="ti-del" title="Delete">×</button>
+      `;
+      row.querySelector('.ti-name').addEventListener('click', () => setSelected(child));
+      row.querySelector('.ti-vis').addEventListener('click', e => {
+        e.stopPropagation();
+        child.visible = !child.visible;
+        const btn = e.currentTarget;
+        btn.textContent = child.visible ? '●' : '○';
+        btn.classList.toggle('hidden', !child.visible);
+        if (selected === child && !child.visible) setSelected(null);
+        if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+      });
+      row.querySelector('.ti-del').addEventListener('click', e => {
+        e.stopPropagation();
+        if (!confirm(`Delete "${child.name}"?`)) return;
+        deleteAssembly(child);
+        if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+      });
+      tree.appendChild(row);
+    });
+
+    hdr.querySelector('.caret').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = tree.style.display === 'block';
+      tree.style.display = open ? 'none' : 'block';
+      hdr.querySelector('.caret').textContent = open ? '▶' : '▼';
+    });
+    hdr.querySelector('.lname').addEventListener('click', () => {
+      const open = tree.style.display === 'block';
+      tree.style.display = open ? 'none' : 'block';
+      hdr.querySelector('.caret').textContent = open ? '▶' : '▼';
+    });
+    hdr.querySelector('input').addEventListener('change', (e) => {
+      group.visible = e.target.checked;
+      if (selected && !e.target.checked && findLayerOf(selected) === name) setSelected(null);
+      if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+    });
+
+    layersEl.appendChild(wrap);
+  });
+}
+
+function findLayerOf(obj) {
+  let cur = obj;
+  while (cur) {
+    if (LAYER_NAMES.includes(cur.name)) return cur.name;
+    cur = cur.parent;
+  }
+  return null;
+}
+buildSidebar();
+
+const camerasDiv = document.getElementById('cameras');
+camerasDiv.innerHTML = '';
+const camPresets = {
+  'Aerial SW (golden hour)': { pos: [-12, -7, 7], target: [4.75, 5.5, 1.5] },
+  'Aerial S (front)':         { pos: [4.75, -14, 12], target: [4.75, 5.5, 1] },
+  'Aerial N (back)':          { pos: [4.75, 25, 12], target: [4.75, 5.5, 1] },
+  'Aerial W (mountain side)': { pos: [-14, 5.5, 12], target: [4.75, 5.5, 1] },
+  'Aerial E (front yard)':    { pos: [24, 5.5, 12], target: [4.75, 5.5, 1] },
+  'Top-down':                 { pos: [4.75, 5.5, 22], target: [4.75, 5.5, 0] },
+  'Cutaway SE':               { pos: [18, -8, 14], target: [4.75, 5.5, 0.5], hide: ['Roof', 'Ceilings', 'Trim_Eaves', 'Lighting_Fixtures'] },
+  'Cutaway NW':               { pos: [-10, 18, 12], target: [4.75, 5, 1], hide: ['Roof', 'Ceilings', 'Trim_Eaves', 'Lighting_Fixtures'] },
+};
+Object.entries(camPresets).forEach(([label, c]) => {
+  const row = document.createElement('div');
+  row.className = 'camera-row';
+  row.innerHTML = `<button class="cam-btn">${label}</button>`;
+  row.querySelector('button').addEventListener('click', () => {
+    camera.position.set(...c.pos);
+    orbit.target.set(...c.target);
+    orbit.update();
+    document.querySelectorAll('input[data-layer]').forEach(cb => {
+      const layerName = cb.dataset.layer;
+      const shouldHide = c.hide && c.hide.includes(layerName);
+      cb.checked = !shouldHide;
+      layers[layerName].visible = !shouldHide;
+    });
+  });
+  camerasDiv.appendChild(row);
+});
+
+document.querySelectorAll('button.mode').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('button.mode').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    transform.setMode(btn.dataset.mode);
+  });
+});
+document.getElementById('deselect').addEventListener('click', () => setSelected(null));
+
+document.getElementById('envX').value = params.envX;
+document.getElementById('envY').value = params.envY;
+document.getElementById('wallTopZ').value = params.wallTopZ;
+document.getElementById('peakZ').value = params.peakZ;
+document.getElementById('rebuild').addEventListener('click', () => {
+  params.envX = parseFloat(document.getElementById('envX').value);
+  params.envY = parseFloat(document.getElementById('envY').value);
+  params.wallTopZ = parseFloat(document.getElementById('wallTopZ').value);
+  params.peakZ = parseFloat(document.getElementById('peakZ').value);
+  setSelected(null);
+  buildVilla();
+  buildSidebar();
+  if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+});
+
+function showSelection(g) {
+  const sel = document.getElementById('selection');
+  sel.innerHTML = `
+    <div class="name">${g.name}</div>
+    <div class="layer-tag">${g.userData.layer}</div>
+    <div class="sel-section">Position</div>
+    <div class="field"><span>X</span><input type="number" step="0.05" id="sel-x" value="${g.position.x.toFixed(2)}"></div>
+    <div class="field"><span>Y</span><input type="number" step="0.05" id="sel-y" value="${g.position.y.toFixed(2)}"></div>
+    <div class="field"><span>Z</span><input type="number" step="0.05" id="sel-z" value="${g.position.z.toFixed(2)}"></div>
+    <div class="sel-section">Scale</div>
+    <div class="field"><span>SX</span><input type="number" step="0.05" id="sel-sx" value="${g.scale.x.toFixed(2)}"></div>
+    <div class="field"><span>SY</span><input type="number" step="0.05" id="sel-sy" value="${g.scale.y.toFixed(2)}"></div>
+    <div class="field"><span>SZ</span><input type="number" step="0.05" id="sel-sz" value="${g.scale.z.toFixed(2)}"></div>
+    <div class="sel-section">Rotation</div>
+    <div class="field"><span>RZ°</span><input type="number" step="5" id="sel-rz" value="${THREE.MathUtils.radToDeg(g.rotation.z).toFixed(0)}"></div>
+    <div class="sel-actions">
+      <button id="sel-vis" class="full">${g.visible ? 'Hide' : 'Show'}</button>
+      <button id="sel-dup" class="full">Duplicate</button>
+      <button id="sel-del" class="full danger">Delete</button>
+    </div>
+  `;
+  ['x', 'y', 'z'].forEach(ax => {
+    sel.querySelector(`#sel-${ax}`).addEventListener('input', e => {
+      g.position[ax] = parseFloat(e.target.value);
+      if (selectionHelper) selectionHelper.update();
+      if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+    });
+    sel.querySelector(`#sel-s${ax}`).addEventListener('input', e => {
+      const v = parseFloat(e.target.value);
+      if (v > 0.01) {
+        g.scale[ax] = v;
+        if (selectionHelper) selectionHelper.update();
+        if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+      }
+    });
+  });
+  sel.querySelector('#sel-rz').addEventListener('input', e => {
+    g.rotation.z = THREE.MathUtils.degToRad(parseFloat(e.target.value));
+    if (selectionHelper) selectionHelper.update();
+    if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+  });
+  sel.querySelector('#sel-vis').addEventListener('click', () => {
+    g.visible = !g.visible;
+    showSelection(g);
+    buildSidebar();
+    if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+  });
+  sel.querySelector('#sel-dup').addEventListener('click', () => {
+    const clone = g.clone(true);
+    clone.name = g.name + '_copy';
+    clone.position.x += 0.5;
+    g.parent.add(clone);
+    buildSidebar();
+    setSelected(clone);
+    if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+  });
+  sel.querySelector('#sel-del').addEventListener('click', () => {
+    if (!confirm(`Delete "${g.name}"?`)) return;
+    deleteAssembly(g);
+    if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+  });
+}
+
+function refreshSelectionFields() {
+  if (!selected) return;
+  const sx = document.getElementById('sel-x');
+  if (!sx) return;
+  sx.value = selected.position.x.toFixed(2);
+  document.getElementById('sel-y').value = selected.position.y.toFixed(2);
+  document.getElementById('sel-z').value = selected.position.z.toFixed(2);
+  document.getElementById('sel-rz').value = THREE.MathUtils.radToDeg(selected.rotation.z).toFixed(0);
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  switch (e.key.toLowerCase()) {
+    case 'g': transform.setMode('translate'); setActiveModeBtn('translate'); break;
+    case 'r': transform.setMode('rotate'); setActiveModeBtn('rotate'); break;
+    case 's': transform.setMode('scale'); setActiveModeBtn('scale'); break;
+    case 'x': transform.showX = true; transform.showY = false; transform.showZ = false; break;
+    case 'y': transform.showX = false; transform.showY = true; transform.showZ = false; break;
+    case 'z': transform.showX = false; transform.showY = false; transform.showZ = true; break;
+    case 'a': transform.showX = transform.showY = transform.showZ = true; break;
+    case 'escape': setSelected(null); break;
+  }
+});
+
+function setActiveModeBtn(mode) {
+  document.querySelectorAll('button.mode').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+}
+
+window.addEventListener('resize', () => {
+  if (camera.isPerspectiveCamera) camera.aspect = viewW() / viewH();
+  camera.updateProjectionMatrix();
+  renderer.setSize(viewW(), viewH());
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  orbit.update();
+  if (selectionHelper) selectionHelper.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ========================================================================
+// PERSISTENCE (localStorage auto-save + JSON export/import)
+// ========================================================================
+const STATE_KEY = 'mountain-villa-state-v1';
+
+function snapshotState() {
+  const s = {
+    version: 1,
+    timestamp: new Date().toISOString(),
+    params: { ...params },
+    layerVisibility: {},
+    assemblies: {},
+  };
+  LAYER_NAMES.forEach(n => {
+    s.layerVisibility[n] = layers[n].visible;
+    s.assemblies[n] = [];
+    layers[n].children.forEach(c => {
+      if (c.userData?.isAssembly) {
+        s.assemblies[n].push({
+          name: c.name,
+          pos: [c.position.x, c.position.y, c.position.z],
+          rot: [c.rotation.x, c.rotation.y, c.rotation.z],
+          scale: [c.scale.x, c.scale.y, c.scale.z],
+          visible: c.visible,
+        });
+      }
+    });
+  });
+  return s;
+}
+
+function restoreState(state) {
+  if (!state) return;
+  if (state.params) Object.assign(params, state.params);
+  setSelected(null);
+  buildVilla();
+  // Index assemblies by name
+  const byName = new Map();
+  Object.values(layers).forEach(g => g.children.forEach(c => {
+    if (c.userData?.isAssembly) byName.set(c.name, c);
+  }));
+  // Identify defaults that no longer exist in saved state → delete them
+  const survived = new Set();
+  if (state.assemblies) {
+    Object.entries(state.assemblies).forEach(([layerName, items]) => {
+      items.forEach(item => {
+        survived.add(item.name);
+        const obj = byName.get(item.name);
+        if (obj) {
+          obj.position.set(item.pos[0], item.pos[1], item.pos[2]);
+          obj.rotation.set(item.rot[0], item.rot[1], item.rot[2]);
+          obj.scale.set(item.scale[0], item.scale[1], item.scale[2]);
+          obj.visible = item.visible;
+        }
+      });
+    });
+  }
+  // Remove default assemblies missing from state (= user deleted them previously)
+  Object.values(layers).forEach(g => {
+    [...g.children].forEach(c => {
+      if (c.userData?.isAssembly && !survived.has(c.name)) {
+        c.traverse(x => { if (x.geometry) x.geometry.dispose(); });
+        g.remove(c);
+      }
+    });
+  });
+  if (state.layerVisibility) {
+    Object.entries(state.layerVisibility).forEach(([n, v]) => {
+      if (layers[n]) layers[n].visible = v;
+    });
+  }
+  buildSidebar();
+}
+
+function saveLocal() {
+  try { localStorage.setItem(STATE_KEY, JSON.stringify(snapshotState())); } catch (e) { console.warn(e); }
+}
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function clearLocal() { localStorage.removeItem(STATE_KEY); }
+
+let saveTimer = null;
+function scheduleAutoSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveLocal, 400);
+}
+
+// Hook into the transform gizmo's drag end
+transform.addEventListener('objectChange', scheduleAutoSave);
+
+// Wrap sidebar mutation handlers to trigger auto-save
+const origDeleteAssembly = deleteAssembly;
+window.deleteAssembly = function(g) { origDeleteAssembly(g); scheduleAutoSave(); };
+// (overrides above; the let-defined one is reused via closures already, so we re-bind by assignment)
+// Easier: monkey-patch at sites where they matter — done at the end of each handler that fires it.
+
+// Auto-restore on load
+const _loaded = loadLocal();
+if (_loaded) {
+  try {
+    restoreState(_loaded);
+    console.log('Restored from localStorage:', _loaded.timestamp);
+  } catch (e) { console.warn('Restore failed:', e); clearLocal(); }
+}
+
+// === FILE EXPORT/IMPORT ===
+function downloadJSON() {
+  const data = JSON.stringify(snapshotState(), null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  a.href = url;
+  a.download = `villa-state-${now}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function uploadJSON() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        restoreState(JSON.parse(ev.target.result));
+        saveLocal();
+      } catch (err) { alert('Invalid state file: ' + err.message); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+function resetToDefaults() {
+  if (!confirm('Discard all your changes and reset to the original layout?')) return;
+  clearLocal();
+  // Re-init params to canonical defaults
+  Object.assign(params, {
+    envX: 9.5, envY: 11.0,
+    wallTopZ: 3.25, wallBtmZ: 0.45,
+    peakZ: 5.45, ridgeY: 5.5,
+    ridgeXfromW: 1.4, ridgeXfromE: 1.4,
+    extWT: 0.20, intWT: 0.15,
+    ovh: { n: 0.8, s: 0.8, e: 0.8, w: 1.2 },
+    roofThick: 0.10,
+    P4_y: 3.5,
+  });
+  setSelected(null);
+  buildVilla();
+  buildSidebar();
+}
+
+// Hook the File buttons (added via index.html below)
+document.getElementById('file-save')?.addEventListener('click', downloadJSON);
+document.getElementById('file-load')?.addEventListener('click', uploadJSON);
+document.getElementById('file-reset')?.addEventListener('click', resetToDefaults);
+
+window.layers = layers;
+window.params = params;
+window.buildVilla = buildVilla;
+window.buildSidebar = buildSidebar;
+window.scene = scene;
+window.setSelected = setSelected;
+window.snapshotState = snapshotState;
+window.restoreState = restoreState;
+window.scheduleAutoSave = scheduleAutoSave;
+console.log('Editor loaded. envelope=', params.envX, '×', params.envY);
