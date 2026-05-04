@@ -1,6 +1,9 @@
 # Mountain Villa — Browser Editor
 
-Three.js single-page editor that mirrors the Blender model. Click furniture/doors/windows to select and move them; toggle layers; switch cameras; resize the envelope live.
+**Live:** https://b2qu0y0mhumeod53i1psi7xf.156.67.216.187.sslip.io
+**Repo:** https://github.com/xidik12/mountain-villa-editor
+
+Three.js single-page editor that mirrors the Blender model. Click furniture/doors/windows to select and move them; toggle layers; switch cameras; resize the envelope live. Each visitor's edits auto-save to their own browser; share a state file via the **⬇ Download JSON** button.
 
 ## Run
 
