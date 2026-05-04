@@ -210,11 +210,19 @@ function rebuildWallById(id) {
       const perp = def.axis === 'x' ? o.position.y : o.position.x;
       if (Math.abs(perp - def.lineCoord) > 0.5) return;
       const along = def.axis === 'x' ? o.position.x : o.position.y;
-      // Clamp opening to within wall bounds (so it doesn't poke past the ends)
-      const w = o.userData.openingW;
+      // Effective opening dims = base × current scale on the relevant axes
+      const scaleAlong = def.axis === 'x' ? o.scale.x : o.scale.y;
+      const w = (o.userData.openingW || 0.9) * Math.abs(scaleAlong);
+      const baseSill = o.userData.openingSill;
+      const baseTop  = o.userData.openingTop;
+      const baseH = baseTop - baseSill;
+      // Anchor was set to baseSill (or FFL for doors), so group.position.z is the current world bottom
+      const sill = o.position.z;
+      const top  = sill + baseH * Math.abs(o.scale.z);
+      // Skip if the opening would poke past the wall ends
       if (along - w/2 < def.alongStart - 0.01) return;
       if (along + w/2 > def.alongEnd + 0.01) return;
-      ops.push({ c: along, w, sill: o.userData.openingSill, top: o.userData.openingTop });
+      ops.push({ c: along, w, sill, top });
     });
   });
   ops.sort((a, b) => a.c - b.c);
@@ -317,7 +325,8 @@ function buildVilla() {
       partBox(a, '_Leaf', [x, y, z], [0.04, w - 0.02, h - 0.02], leafMat);
       partBox(a, '_Knob', [x + 0.06, y + w/2 - 0.1, FFL + 1.0], [0.03, 0.04, 0.04], M.alu);
     }
-    setAnchor(a, x, y, 0);   // group.position = (x, y, 0) → wall builder reads correct along-coord
+    // Anchor to door bottom (FFL) so SZ scale stretches upward from the floor
+    setAnchor(a, x, y, FFL);
     return a;
   }
   function slider(name, x, y, w, h, dirn, wallId) {
@@ -341,7 +350,7 @@ function buildVilla() {
       partBox(a, '_GlassR', [x, y + w/4, z], [0.025, w/2 - 0.05, h - 0.10], M.glass);
       partBox(a, '_Handle', [x + 0.07, y, z], [0.02, 0.20, 0.03], M.alu);
     }
-    setAnchor(a, x, y, 0);
+    setAnchor(a, x, y, FFL);
     return a;
   }
 
@@ -378,7 +387,8 @@ function buildVilla() {
       const off = x < cx ? -0.06 : 0.06;
       partBox(a, '_Sill', [x + off, y, sill - 0.06], [0.20, w + 0.18, 0.06], M.plinth);
     }
-    setAnchor(a, x, y, 0);
+    // Anchor to window sill so SZ stretches upward
+    setAnchor(a, x, y, sill);
     return a;
   }
   function louver(name, x, y, w, h, sill, dirn, wallId) {
@@ -397,19 +407,19 @@ function buildVilla() {
       }
       partBox(a, '_Sill', [x, y - 0.06, sill - 0.04], [w + 0.16, 0.16, 0.06], M.plinth);
     }
-    setAnchor(a, x, y, 0);
+    setAnchor(a, x, y, sill);
     return a;
   }
 
-  // Window schedule per plumbing.svg
-  casement('W1_master_W', 0,      9, 1.5, 1.2, 1.0, 'x', 'EW_W_west_wall');
-  casement('W2_BR2_E',    p.envX, 9, 1.5, 1.2, 1.0, 'x', 'EW_E_east_wall');
-  casement('W3_BR1_E',    p.envX, 5, 1.5, 1.2, 1.0, 'x', 'EW_E_east_wall');
-  casement('W4_dining_W', 0,      5, 2.5, 1.5, 1.0, 'x', 'EW_W_west_wall');
-  casement('W5_dining_W', 0,      2, 2.5, 1.5, 1.0, 'x', 'EW_W_west_wall');
-  casement('W6_dining_S', 1.55,   0, 1.2, 1.2, 1.0, 'y', 'EW_S_south_wall');
-  louver  ('W7_bath_S',   7.0,    0, 0.5, 0.6, 1.8, 'y', 'EW_S_south_wall');
-  louver  ('W8_WC_S',     8.75,   0, 0.6, 0.6, 1.8, 'y', 'EW_S_south_wall');
+  // Window schedule. Dining windows tall (sill 0.5, h 2.45 → top 2.95, leaves 30cm for drape rod).
+  casement('W1_master_W', 0,      9, 1.5, 1.2,  1.0, 'x', 'EW_W_west_wall');
+  casement('W2_BR2_E',    p.envX, 9, 1.5, 1.2,  1.0, 'x', 'EW_E_east_wall');
+  casement('W3_BR1_E',    p.envX, 5, 1.5, 1.2,  1.0, 'x', 'EW_E_east_wall');
+  casement('W4_dining_W', 0,      5, 2.5, 2.45, 0.5, 'x', 'EW_W_west_wall');   // mountain — floor to near-ceiling
+  casement('W5_dining_W', 0,      2, 2.5, 2.45, 0.5, 'x', 'EW_W_west_wall');   // mountain — floor to near-ceiling
+  casement('W6_dining_S', 1.55,   0, 1.2, 2.45, 0.5, 'y', 'EW_S_south_wall'); // dining south — tall too
+  louver  ('W7_bath_S',   7.0,    0, 0.5, 0.6,  1.8, 'y', 'EW_S_south_wall');
+  louver  ('W8_WC_S',     8.75,   0, 0.6, 0.6,  1.8, 'y', 'EW_S_south_wall');
 
   // === ROOF ===
   if (p.roofType === 'flat') buildFlatRoof();
@@ -718,8 +728,9 @@ transform.addEventListener('dragging-changed', e => {
         // Snap to wall plane (lock perpendicular)
         if (def.axis === 'x') selected.position.y = def.lineCoord;
         else                  selected.position.x = def.lineCoord;
-        // Clamp along the wall
-        const halfW = (selected.userData.openingW || 0.9) / 2;
+        // Clamp along the wall — use SCALED opening width
+        const scaleAlong = def.axis === 'x' ? selected.scale.x : selected.scale.y;
+        const halfW = ((selected.userData.openingW || 0.9) * Math.abs(scaleAlong)) / 2;
         const minAlong = def.alongStart + halfW + 0.05;
         const maxAlong = def.alongEnd   - halfW - 0.05;
         const along = def.axis === 'x' ? selected.position.x : selected.position.y;
@@ -1033,6 +1044,7 @@ function showSelection(g) {
       if (v > 0.01) {
         g.scale[ax] = v;
         if (selectionHelper) selectionHelper.update();
+        queueWallRebuild();   // wall hole follows scale change
         if (typeof recordChange === 'function') recordChange();
       }
     });
