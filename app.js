@@ -164,6 +164,67 @@ function clearAllLayers() {
   });
 }
 
+// === WALL DEFINITIONS (filled by buildVilla) + rebuild from current door/window positions ===
+const wallDefs = [];
+
+function findWallAssembly(id) {
+  for (const layerName of ['Walls_Exterior', 'Walls_Interior']) {
+    const found = layers[layerName].children.find(c => c.name === id);
+    if (found) return found;
+  }
+  return null;
+}
+
+function rebuildWallById(id) {
+  const def = wallDefs.find(d => d.id === id);
+  if (!def) return;
+  const wall = findWallAssembly(id);
+  if (!wall) return;
+  // Clear current segments
+  while (wall.children.length) {
+    const c = wall.children[0];
+    wall.remove(c);
+    if (c.geometry) c.geometry.dispose();
+  }
+  // Collect openings whose userData.wallId == id (visible only — hidden openings = solid wall there)
+  const ops = [];
+  ['Doors', 'Windows'].forEach(layerName => {
+    layers[layerName].children.forEach(o => {
+      if (o.userData?.wallId === id && o.visible) {
+        const c = def.axis === 'x' ? o.position.x : o.position.y;
+        ops.push({ c, w: o.userData.openingW, sill: o.userData.openingSill, top: o.userData.openingTop });
+      }
+    });
+  });
+  ops.sort((a, b) => a.c - b.c);
+  // Build segments around openings
+  const wallTop = params.wallTopZ, wallBot = params.wallBtmZ;
+  const addSeg = (alongCenter, alongLen, zCenter, zHeight) => {
+    if (alongLen < 0.001 || zHeight < 0.001) return;
+    const pos = def.axis === 'x'
+      ? [alongCenter, def.lineCoord, zCenter]
+      : [def.lineCoord, alongCenter, zCenter];
+    const size = def.axis === 'x'
+      ? [alongLen, def.thickness, zHeight]
+      : [def.thickness, alongLen, zHeight];
+    partBox(wall, `_seg_${alongCenter.toFixed(2)}_${zCenter.toFixed(2)}`, pos, size, def.mat);
+  };
+  let prev = def.alongStart;
+  for (const op of ops) {
+    const opStart = op.c - op.w / 2;
+    const opEnd   = op.c + op.w / 2;
+    if (opStart > prev + 0.001) addSeg((prev + opStart) / 2, opStart - prev, (wallBot + wallTop) / 2, wallTop - wallBot);
+    if (op.sill > wallBot + 0.001) addSeg(op.c, op.w, (wallBot + op.sill) / 2, op.sill - wallBot);
+    if (op.top < wallTop - 0.001) addSeg(op.c, op.w, (op.top + wallTop) / 2, wallTop - op.top);
+    prev = opEnd;
+  }
+  if (def.alongEnd > prev + 0.001) addSeg((prev + def.alongEnd) / 2, def.alongEnd - prev, (wallBot + wallTop) / 2, wallTop - wallBot);
+}
+
+function rebuildAllWalls() {
+  wallDefs.forEach(def => rebuildWallById(def.id));
+}
+
 // ========================================================================
 // VILLA BUILDER (9.5 × 11 — prior layout with strip-width tweak)
 // ========================================================================
@@ -192,90 +253,34 @@ function buildVilla() {
   soloBox('FloorTile_Bath', 'Foundation', [7.0,  1.0, 0.4525], [1.825, 1.825, 0.005], M.wet);
   soloBox('FloorTile_WC',   'Foundation', [8.75, 1.0, 0.4525], [1.325, 1.825, 0.005], M.wet);
 
-  // === WALLS WITH OPENINGS ===
+  // === WALL DEFINITIONS (metadata only — geometry rebuilt later from openings) ===
   const wallTop = p.wallTopZ, wallBot = p.wallBtmZ;
   const doorTop = wallBot + 2.1;
 
-  function buildWall(name, layer, axis, lineCoord, alongStart, alongEnd, thickness, mat, openings) {
-    const a = assembly(name, layer);
-    const sorted = [...openings].sort((x, y) => x.c - y.c);
-    let prev = alongStart;
-    function addSeg(alongCenter, alongLen, zCenter, zHeight) {
-      if (alongLen < 0.001 || zHeight < 0.001) return;
-      const pos = axis === 'x'
-        ? [alongCenter, lineCoord, zCenter]
-        : [lineCoord, alongCenter, zCenter];
-      const size = axis === 'x'
-        ? [alongLen, thickness, zHeight]
-        : [thickness, alongLen, zHeight];
-      partBox(a, `_seg_${alongCenter.toFixed(2)}_${zCenter.toFixed(2)}`, pos, size, mat);
-    }
-    for (const op of sorted) {
-      const opStart = op.c - op.w / 2;
-      const opEnd   = op.c + op.w / 2;
-      if (opStart > prev + 0.001) {
-        addSeg((prev + opStart) / 2, opStart - prev, (wallBot + wallTop) / 2, wallTop - wallBot);
-      }
-      if (op.sill > wallBot + 0.001) {
-        addSeg(op.c, op.w, (wallBot + op.sill) / 2, op.sill - wallBot);
-      }
-      if (op.top < wallTop - 0.001) {
-        addSeg(op.c, op.w, (op.top + wallTop) / 2, wallTop - op.top);
-      }
-      prev = opEnd;
-    }
-    if (alongEnd > prev + 0.001) {
-      addSeg((prev + alongEnd) / 2, alongEnd - prev, (wallBot + wallTop) / 2, wallTop - wallBot);
-    }
-    return a;
-  }
+  // Reset and populate the global wallDefs[] (used by rebuildWallById on edits)
+  wallDefs.length = 0;
+  wallDefs.push(
+    { id: 'EW_S_south_wall', layer: 'Walls_Exterior', axis: 'x', lineCoord: 0,         alongStart: -p.extWT/2, alongEnd: p.envX + p.extWT/2, thickness: p.extWT, mat: M.ext },
+    { id: 'EW_N_north_wall', layer: 'Walls_Exterior', axis: 'x', lineCoord: p.envY,    alongStart: -p.extWT/2, alongEnd: p.envX + p.extWT/2, thickness: p.extWT, mat: M.ext },
+    { id: 'EW_W_west_wall',  layer: 'Walls_Exterior', axis: 'y', lineCoord: 0,         alongStart: -p.extWT/2, alongEnd: p.envY + p.extWT/2, thickness: p.extWT, mat: M.ext },
+    { id: 'EW_E_east_wall',  layer: 'Walls_Exterior', axis: 'y', lineCoord: p.envX,    alongStart: -p.extWT/2, alongEnd: p.envY + p.extWT/2, thickness: p.extWT, mat: M.ext },
+    { id: 'P1_master_BR2',        layer: 'Walls_Interior', axis: 'y', lineCoord: 4,       alongStart: 7,       alongEnd: 11,        thickness: p.intWT, mat: M.int },
+    { id: 'P2_bedrooms_dining',   layer: 'Walls_Interior', axis: 'x', lineCoord: 7,       alongStart: 0,       alongEnd: p.envX,    thickness: p.intWT, mat: M.int },
+    { id: 'P3_dining_BR1',        layer: 'Walls_Interior', axis: 'y', lineCoord: 5.5,     alongStart: p.P4_y,  alongEnd: 7,         thickness: p.intWT, mat: M.int },
+    { id: 'P4_BR1_diningEstrip',  layer: 'Walls_Interior', axis: 'x', lineCoord: p.P4_y,  alongStart: 5.5,     alongEnd: p.envX,    thickness: p.intWT, mat: M.int },
+    { id: 'P5_diningEstrip_wet',  layer: 'Walls_Interior', axis: 'x', lineCoord: 2,       alongStart: 6,       alongEnd: p.envX,    thickness: p.intWT, mat: M.int },
+    { id: 'P6_kitchen_bath',      layer: 'Walls_Interior', axis: 'y', lineCoord: 6,       alongStart: 0,       alongEnd: 2,         thickness: p.intWT, mat: M.int },
+    { id: 'P7_bath_WC',           layer: 'Walls_Interior', axis: 'y', lineCoord: 8,       alongStart: 0,       alongEnd: 2,         thickness: p.intWT, mat: M.int },
+  );
 
-  // === EXTERIOR WALLS (per plan-A-plumbing.svg layout) ===
-  buildWall('EW_S_south_wall', 'Walls_Exterior', 'x', 0,        -p.extWT/2, p.envX + p.extWT/2, p.extWT, M.ext, [
-    { c: 1.55, w: 1.2, sill: 1.0,    top: 2.2 },              // W6 dining S casement (per SVG)
-    { c: 4.0,  w: 1.5, sill: wallBot, top: doorTop },         // D6 main entry slider
-    { c: 7.0,  w: 0.5, sill: 1.8,    top: 2.4 },              // W7 bath S frosted
-    { c: 8.75, w: 0.6, sill: 1.8,    top: 2.4 },              // W8 WC S frosted
-  ]);
-  buildWall('EW_N_north_wall', 'Walls_Exterior', 'x', p.envY,   -p.extWT/2, p.envX + p.extWT/2, p.extWT, M.ext, []);
-  buildWall('EW_W_west_wall',  'Walls_Exterior', 'y', 0,        -p.extWT/2, p.envY + p.extWT/2, p.extWT, M.ext, [
-    { c: 9.0, w: 1.5, sill: 1.0, top: 2.2 },                  // W1 master W
-    { c: 5.0, w: 2.5, sill: 1.0, top: 2.5 },                  // W4 dining big mountain
-    { c: 2.0, w: 2.5, sill: 1.0, top: 2.5 },                  // W5 dining big mountain
-  ]);
-  buildWall('EW_E_east_wall',  'Walls_Exterior', 'y', p.envX,   -p.extWT/2, p.envY + p.extWT/2, p.extWT, M.ext, [
-    { c: 2.5, w: 0.9, sill: wallBot, top: doorTop },          // D7 service
-    { c: 5.0, w: 1.5, sill: 1.0,     top: 2.2 },              // W3 BR1 E
-    { c: 9.0, w: 1.5, sill: 1.0,     top: 2.2 },              // W2 BR2 E
-  ]);
+  // Create empty wall assemblies (segments added by rebuildWallById once openings exist)
+  wallDefs.forEach(def => assembly(def.id, def.layer));
 
-  // === INTERIOR PARTITIONS (7) ===
-  // P1: x=4, y=7→11 (Master/BR2)
-  buildWall('P1_master_BR2',        'Walls_Interior', 'y', 4,    7,         11,         p.intWT, M.int, []);
-  // P2: y=7, x=0→9.5 (long horizontal — bedrooms/dining)
-  buildWall('P2_bedrooms_dining',   'Walls_Interior', 'x', 7,    0,         p.envX,     p.intWT, M.int, [
-    { c: 2.0,  w: 0.9, sill: wallBot, top: doorTop },  // D1 master
-    { c: 4.75, w: 0.9, sill: wallBot, top: doorTop },  // D2 BR2
-  ]);
-  // P3: x=5.5, y=P4_y→7 (dining/BR1) — length now 3.5m (was 4m)
-  buildWall('P3_dining_BR1',        'Walls_Interior', 'y', 5.5,  p.P4_y,    7,          p.intWT, M.int, [
-    { c: 6.35, w: 0.9, sill: wallBot, top: doorTop },  // D3 BR1
-  ]);
-  // P4: y=P4_y (3.5), x=5.5→9.5 (BR1/dining-E strip) — moved south 0.5m
-  buildWall('P4_BR1_diningEstrip',  'Walls_Interior', 'x', p.P4_y, 5.5,     p.envX,     p.intWT, M.int, []);
-  // P5: y=2, x=6→9.5 (dining-E strip / wet zone)
-  buildWall('P5_diningEstrip_wet',  'Walls_Interior', 'x', 2,    6,         p.envX,     p.intWT, M.int, [
-    { c: 7.0,  w: 0.8, sill: wallBot, top: doorTop },  // D4 bath
-    { c: 8.75, w: 0.7, sill: wallBot, top: doorTop },  // D5 WC
-  ]);
-  // P6: x=6, y=0→2 (kitchen/bath west)
-  buildWall('P6_kitchen_bath',      'Walls_Interior', 'y', 6,    0,         2,          p.intWT, M.int, []);
-  // P7: x=8, y=0→2 (bath/WC)
-  buildWall('P7_bath_WC',           'Walls_Interior', 'y', 8,    0,         2,          p.intWT, M.int, []);
-
-  // === DOORS (visible meshes — sit in the wall holes) ===
-  function door(name, x, y, w, h, dirn, leafMat) {
+  // === DOORS — each is an assembly tagged with the wall it belongs to,
+  //    so when it moves the wall opening follows automatically.
+  function door(name, x, y, w, h, dirn, leafMat, wallId) {
     const a = assembly(name, 'Doors');
+    Object.assign(a.userData, { wallId, openingW: w, openingSill: FFL, openingTop: FFL + h, openingDirn: dirn });
     const z = FFL + h / 2;
     const fw = 0.08, fd = 0.12;
     if (dirn === 'y') {
@@ -293,8 +298,9 @@ function buildVilla() {
     }
     return a;
   }
-  function slider(name, x, y, w, h, dirn) {
+  function slider(name, x, y, w, h, dirn, wallId) {
     const a = assembly(name, 'Doors');
+    Object.assign(a.userData, { wallId, openingW: w, openingSill: FFL, openingTop: FFL + h, openingDirn: dirn });
     const z = FFL + h / 2;
     if (dirn === 'y') {
       partBox(a, '_TopRail', [x, y, FFL + h - 0.04], [w + 0.16, 0.10, 0.08], M.alu);
@@ -305,7 +311,6 @@ function buildVilla() {
       partBox(a, '_GlassR', [x + w/4, y, z], [w/2 - 0.05, 0.025, h - 0.10], M.glass);
       partBox(a, '_Handle', [x, y + 0.07, z], [0.20, 0.02, 0.03], M.alu);
     } else {
-      // dirn = 'x' (east-wall slider)
       partBox(a, '_TopRail', [x, y, FFL + h - 0.04], [0.10, w + 0.16, 0.08], M.alu);
       partBox(a, '_BotRail', [x, y, FFL + 0.04],     [0.10, w + 0.16, 0.08], M.alu);
       partBox(a, '_LJamb', [x, y - w/2 - 0.04, z], [0.10, 0.08, h], M.alu);
@@ -318,17 +323,18 @@ function buildVilla() {
   }
 
   // Door schedule per plumbing.svg
-  door('D1_master_door',  2.0,   7.0, 0.9, 2.1, 'y', M.wood);
-  door('D2_BR2_door',     4.75,  7.0, 0.9, 2.1, 'y', M.wood);
-  door('D3_BR1_door',     5.5,   6.35, 0.9, 2.1, 'x', M.wood);
-  door('D4_bath_door',    7.0,   2.0, 0.8, 2.1, 'y', M.trim);
-  door('D5_WC_door',      8.75,  2.0, 0.7, 2.1, 'y', M.trim);
-  door('D7_service_door', p.envX, 2.5, 0.9, 2.1, 'x', M.wood);
-  slider('D6_main_entry', 4.0, 0, 1.5, 2.1, 'y');
+  door('D1_master_door',  2.0,   7.0,  0.9, 2.1, 'y', M.wood, 'P2_bedrooms_dining');
+  door('D2_BR2_door',     4.75,  7.0,  0.9, 2.1, 'y', M.wood, 'P2_bedrooms_dining');
+  door('D3_BR1_door',     5.5,   6.35, 0.9, 2.1, 'x', M.wood, 'P3_dining_BR1');
+  door('D4_bath_door',    7.0,   2.0,  0.8, 2.1, 'y', M.trim, 'P5_diningEstrip_wet');
+  door('D5_WC_door',      8.75,  2.0,  0.7, 2.1, 'y', M.trim, 'P5_diningEstrip_wet');
+  door('D7_service_door', p.envX, 2.75, 0.9, 2.1, 'x', M.wood, 'EW_E_east_wall');   // moved to middle of dining-E strip (was 2.5)
+  slider('D6_main_entry', 4.0,   0,    1.5, 2.1, 'y',         'EW_S_south_wall');
 
-  // === WINDOWS ===
-  function casement(name, x, y, w, h, sill, dirn) {
+  // === WINDOWS — also tagged with their wall ===
+  function casement(name, x, y, w, h, sill, dirn, wallId) {
     const a = assembly(name, 'Windows');
+    Object.assign(a.userData, { wallId, openingW: w, openingSill: sill, openingTop: sill + h, openingDirn: dirn });
     const z = sill + h / 2;
     const fw = 0.05, fd = 0.08;
     if (dirn === 'y') {
@@ -351,8 +357,9 @@ function buildVilla() {
     }
     return a;
   }
-  function louver(name, x, y, w, h, sill, dirn) {
+  function louver(name, x, y, w, h, sill, dirn, wallId) {
     const a = assembly(name, 'Windows');
+    Object.assign(a.userData, { wallId, openingW: w, openingSill: sill, openingTop: sill + h, openingDirn: dirn });
     const z = sill + h / 2;
     const fw = 0.04, fd = 0.06;
     if (dirn === 'y') {
@@ -370,14 +377,14 @@ function buildVilla() {
   }
 
   // Window schedule per plumbing.svg
-  casement('W1_master_W', 0,      9, 1.5, 1.2, 1.0, 'x');
-  casement('W2_BR2_E',    p.envX, 9, 1.5, 1.2, 1.0, 'x');
-  casement('W3_BR1_E',    p.envX, 5, 1.5, 1.2, 1.0, 'x');
-  casement('W4_dining_W', 0,      5, 2.5, 1.5, 1.0, 'x');
-  casement('W5_dining_W', 0,      2, 2.5, 1.5, 1.0, 'x');
-  casement('W6_dining_S', 1.55,   0, 1.2, 1.2, 1.0, 'y');
-  louver  ('W7_bath_S',   7.0,    0, 0.5, 0.6, 1.8, 'y');
-  louver  ('W8_WC_S',     8.75,   0, 0.6, 0.6, 1.8, 'y');
+  casement('W1_master_W', 0,      9, 1.5, 1.2, 1.0, 'x', 'EW_W_west_wall');
+  casement('W2_BR2_E',    p.envX, 9, 1.5, 1.2, 1.0, 'x', 'EW_E_east_wall');
+  casement('W3_BR1_E',    p.envX, 5, 1.5, 1.2, 1.0, 'x', 'EW_E_east_wall');
+  casement('W4_dining_W', 0,      5, 2.5, 1.5, 1.0, 'x', 'EW_W_west_wall');
+  casement('W5_dining_W', 0,      2, 2.5, 1.5, 1.0, 'x', 'EW_W_west_wall');
+  casement('W6_dining_S', 1.55,   0, 1.2, 1.2, 1.0, 'y', 'EW_S_south_wall');
+  louver  ('W7_bath_S',   7.0,    0, 0.5, 0.6, 1.8, 'y', 'EW_S_south_wall');
+  louver  ('W8_WC_S',     8.75,   0, 0.6, 0.6, 1.8, 'y', 'EW_S_south_wall');
 
   // === ROOF ===
   buildHipRoof();
@@ -407,6 +414,9 @@ function buildVilla() {
   soloBox('Beam_E', 'Trim_Eaves', [p.envX, cy,   p.wallTopZ + 0.02], [0.25, p.envY + 0.2, 0.04], M.trim);
 
   buildFurniture();
+
+  // Now that all openings exist, generate wall segments around them.
+  rebuildAllWalls();
 }
 
 function buildHipRoof() {
@@ -608,7 +618,8 @@ function buildFurniture() {
   partBox(kit, '_stove',[5.65, 1.70, FFL + 0.88], [0.55, 0.55, 0.02], M.alu);
   soloBox('Kitchen_range_hood', 'Furniture_Kitchen', [5.65, 1.70, FFL + 1.95], [0.62, 0.42, 0.40], M.alu);
   soloBox('Kitchen_upper_cabinets', 'Furniture_Kitchen', [5.50, 1.0, FFL + 1.85], [0.35, 1.80, 0.70], M.wood);
-  soloBox('Kitchen_fridge', 'Furniture_Kitchen', [4.0, 0.45, FFL + 0.85], [0.6, 0.6, 1.70], M.alu);
+  // Fridge moved out of D6 entry path — now west of kitchen counter (counter at x=5.65)
+  soloBox('Kitchen_fridge', 'Furniture_Kitchen', [5.05, 0.45, FFL + 0.85], [0.6, 0.6, 1.70], M.alu);
 
   // === BATH (2×2, x=6-8, y=0-2) — shower NE corner
   const sh = assembly('Bath_shower', 'Furniture_Bath');
@@ -634,7 +645,11 @@ buildVilla();
 const transform = new TransformControls(camera, renderer.domElement);
 transform.addEventListener('dragging-changed', e => {
   orbit.enabled = !e.value;
-  if (!e.value && selected) refreshSelectionFields();
+  if (!e.value && selected) {
+    refreshSelectionFields();
+    // Drag end → if the moved object is a door/window linked to a wall, rebuild that wall
+    if (selected.userData?.wallId) rebuildWallById(selected.userData.wallId);
+  }
 });
 transform.addEventListener('change', () => {
   if (selected) {
@@ -661,6 +676,9 @@ function setSelected(obj) {
     selectionHelper = null;
   }
   selected = obj;
+  // Reset gizmo to all 3 axes (clears any X/Y/Z lock from previous selection)
+  transform.showX = transform.showY = transform.showZ = true;
+  // Mode buttons: refresh "all axes" indicator if you added any (none right now)
   if (obj) {
     selectionHelper = new THREE.BoxHelper(obj, 0x00aaff);
     selectionHelper.material.depthTest = false;
@@ -793,12 +811,15 @@ function buildSidebar() {
         btn.textContent = child.visible ? '●' : '○';
         btn.classList.toggle('hidden', !child.visible);
         if (selected === child && !child.visible) setSelected(null);
+        if (child.userData?.wallId) rebuildWallById(child.userData.wallId);  // wall follows
         if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
       });
       row.querySelector('.ti-del').addEventListener('click', e => {
         e.stopPropagation();
         if (!confirm(`Delete "${child.name}"?`)) return;
+        const wallId = child.userData?.wallId;
         deleteAssembly(child);
+        if (wallId) rebuildWallById(wallId);
         if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
       });
       tree.appendChild(row);
@@ -910,10 +931,18 @@ function showSelection(g) {
       <button id="sel-del" class="full danger">Delete</button>
     </div>
   `;
+  // Debounced wall rebuild for typing in input fields
+  let wallTimer = null;
+  const queueWallRebuild = () => {
+    if (!g.userData?.wallId) return;
+    clearTimeout(wallTimer);
+    wallTimer = setTimeout(() => rebuildWallById(g.userData.wallId), 120);
+  };
   ['x', 'y', 'z'].forEach(ax => {
     sel.querySelector(`#sel-${ax}`).addEventListener('input', e => {
       g.position[ax] = parseFloat(e.target.value);
       if (selectionHelper) selectionHelper.update();
+      queueWallRebuild();
       if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
     });
     sel.querySelector(`#sel-s${ax}`).addEventListener('input', e => {
@@ -932,6 +961,7 @@ function showSelection(g) {
   });
   sel.querySelector('#sel-vis').addEventListener('click', () => {
     g.visible = !g.visible;
+    if (g.userData?.wallId) rebuildWallById(g.userData.wallId);  // wall fills hole when door hidden
     showSelection(g);
     buildSidebar();
     if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
@@ -939,15 +969,20 @@ function showSelection(g) {
   sel.querySelector('#sel-dup').addEventListener('click', () => {
     const clone = g.clone(true);
     clone.name = g.name + '_copy';
+    // Deep-clone userData so the copy carries its own opening tags
+    clone.userData = { ...g.userData };
     clone.position.x += 0.5;
     g.parent.add(clone);
+    if (clone.userData?.wallId) rebuildWallById(clone.userData.wallId);  // new opening
     buildSidebar();
     setSelected(clone);
     if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
   });
   sel.querySelector('#sel-del').addEventListener('click', () => {
     if (!confirm(`Delete "${g.name}"?`)) return;
+    const wallId = g.userData?.wallId;
     deleteAssembly(g);
+    if (wallId) rebuildWallById(wallId);  // wall fills hole
     if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
   });
 }
@@ -1065,6 +1100,8 @@ function restoreState(state) {
       if (layers[n]) layers[n].visible = v;
     });
   }
+  // After restoring all door/window positions, rebuild walls so cuts match
+  rebuildAllWalls();
   buildSidebar();
 }
 
