@@ -142,6 +142,18 @@ function soloBox(name, layerName, pos, size, mat) {
   return a;
 }
 
+// After parts are added at world coords, snap the group's origin to (ax, ay, az)
+// and offset every child by the inverse so world positions don't change.
+// Effect: group.position IS the world location of the assembly, scale & gizmo move work properly.
+function setAnchor(group, ax, ay, az = 0) {
+  group.children.forEach(child => {
+    child.position.x -= ax;
+    child.position.y -= ay;
+    child.position.z -= az;
+  });
+  group.position.set(ax, ay, az);
+}
+
 // === PARAMS (per plan-A-plumbing.svg: 9.5 × 11, dining-E strip 1.5 m thick) ===
 const params = {
   envX: 9.5, envY: 11.0,
@@ -302,6 +314,7 @@ function buildVilla() {
       partBox(a, '_Leaf', [x, y, z], [0.04, w - 0.02, h - 0.02], leafMat);
       partBox(a, '_Knob', [x + 0.06, y + w/2 - 0.1, FFL + 1.0], [0.03, 0.04, 0.04], M.alu);
     }
+    setAnchor(a, x, y, 0);   // group.position = (x, y, 0) → wall builder reads correct along-coord
     return a;
   }
   function slider(name, x, y, w, h, dirn, wallId) {
@@ -325,6 +338,7 @@ function buildVilla() {
       partBox(a, '_GlassR', [x, y + w/4, z], [0.025, w/2 - 0.05, h - 0.10], M.glass);
       partBox(a, '_Handle', [x + 0.07, y, z], [0.02, 0.20, 0.03], M.alu);
     }
+    setAnchor(a, x, y, 0);
     return a;
   }
 
@@ -361,6 +375,7 @@ function buildVilla() {
       const off = x < cx ? -0.06 : 0.06;
       partBox(a, '_Sill', [x + off, y, sill - 0.06], [0.20, w + 0.18, 0.06], M.plinth);
     }
+    setAnchor(a, x, y, 0);
     return a;
   }
   function louver(name, x, y, w, h, sill, dirn, wallId) {
@@ -379,6 +394,7 @@ function buildVilla() {
       }
       partBox(a, '_Sill', [x, y - 0.06, sill - 0.04], [w + 0.16, 0.16, 0.06], M.plinth);
     }
+    setAnchor(a, x, y, 0);
     return a;
   }
 
