@@ -1050,14 +1050,20 @@ function refreshSelectionFields() {
 }
 
 window.addEventListener('keydown', (e) => {
+  // Undo/Redo (Cmd+Z, Cmd+Shift+Z, Ctrl+Y) — work even when an input has focus
+  const cmd = e.metaKey || e.ctrlKey;
+  if (cmd && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    if (e.shiftKey) redo(); else undo();
+    return;
+  }
+  if (cmd && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
   if (e.target.tagName === 'INPUT') return;
   switch (e.key.toLowerCase()) {
     case 'g': transform.setMode('translate'); setActiveModeBtn('translate'); break;
     case 'r': transform.setMode('rotate'); setActiveModeBtn('rotate'); break;
     case 's': transform.setMode('scale'); setActiveModeBtn('scale'); break;
-    case 'x': transform.showX = true; transform.showY = false; transform.showZ = false; break;
-    case 'y': transform.showX = false; transform.showY = true; transform.showZ = false; break;
-    case 'z': transform.showX = false; transform.showY = false; transform.showZ = true; break;
+    // X/Y/Z axis-lock removed — too easy to hit by accident.
     case 'a': transform.showX = transform.showY = transform.showZ = true; break;
     case 'escape': setSelected(null); break;
   }
@@ -1223,8 +1229,11 @@ function recordChange() {
 window.undo = undo;
 window.redo = redo;
 
-// Hook into the transform gizmo's drag end
-transform.addEventListener('objectChange', scheduleAutoSave);
+// Hook into the transform gizmo on every move tick (debounced save + history)
+transform.addEventListener('objectChange', () => {
+  scheduleAutoSave();
+  scheduleHistoryPush();
+});
 
 // Wrap sidebar mutation handlers to trigger auto-save
 const origDeleteAssembly = deleteAssembly;
@@ -1240,6 +1249,8 @@ if (_loaded) {
     console.log('Restored from localStorage:', _loaded.timestamp);
   } catch (e) { console.warn('Restore failed:', e); clearLocal(); }
 }
+// Initial undo baseline so the first ⌘Z brings you back to load-state
+pushHistory();
 
 // === FILE EXPORT/IMPORT ===
 function downloadJSON() {
