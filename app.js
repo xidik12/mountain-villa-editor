@@ -139,6 +139,7 @@ function partCyl(parent, suffix, pos, r, h, mat, axis = 'z') {
 function soloBox(name, layerName, pos, size, mat) {
   const a = assembly(name, layerName);
   partBox(a, '', pos, size, mat);
+  setAnchor(a, pos[0], pos[1], pos[2]);
   return a;
 }
 
@@ -545,6 +546,7 @@ function buildFurniture() {
       partBox(a, '_pillow2',   [cx - L/2 + 0.40, cy + 0.35, FFL + 0.59], [0.30, 0.55, 0.10], M.pillow);
       partBox(a, '_duvet',     [cx + 0.30, cy, FFL + 0.57], [L - 0.7, W - 0.10, 0.04], M.bedding);
     }
+    setAnchor(a, cx, cy, FFL + 0.30);
     return a;
   }
   function nightstand(name, cx, cy, layer, w = 0.35, d = 0.40, h = 0.60) {
@@ -562,6 +564,7 @@ function buildFurniture() {
     const a = assembly(name, layer);
     partCyl(a, '_seat', [cx, cy, FFL + 0.42], r, 0.05, M.fabric);
     partCyl(a, '_back', [cx, cy, FFL + 0.65], r, 0.45, M.fabric);
+    setAnchor(a, cx, cy, FFL + 0.45);
     return a;
   }
   function fan(name, cx, cy, mountZ = 2.8) {
@@ -574,6 +577,7 @@ function buildFurniture() {
       const blade = partBox(a, `_blade${i}`, [bx, by, mountZ + 0.05], [1.20, 0.10, 0.02], M.wood);
       blade.rotation.z = ang;
     }
+    setAnchor(a, cx, cy, mountZ + 0.10);
     return a;
   }
   function chair(name, cx, cy, facing, layer) {
@@ -581,6 +585,7 @@ function buildFurniture() {
     partBox(a, '_seat', [cx, cy, FFL + 0.45], [0.40, 0.45, 0.05], M.wood);
     if (facing === 'north') partBox(a, '_back', [cx, cy + 0.20, FFL + 0.70], [0.40, 0.04, 0.40], M.wood);
     if (facing === 'south') partBox(a, '_back', [cx, cy - 0.20, FFL + 0.70], [0.40, 0.04, 0.40], M.wood);
+    setAnchor(a, cx, cy, FFL + 0.50);
     return a;
   }
 
@@ -620,6 +625,7 @@ function buildFurniture() {
   for (const [i, [ox, oy]] of [[-1.10, -0.45], [1.10, -0.45], [-1.10, 0.45], [1.10, 0.45]].entries()) {
     partBox(dt, `_leg${i}`, [2.4 + ox, 3.1 + oy, FFL + 0.36], [0.06, 0.06, 0.72], M.wood);
   }
+  setAnchor(dt, 2.4, 3.1, FFL + 0.4);
   for (let i = 0; i < 3; i++) {
     const x = [1.6, 2.4, 3.2][i];
     chair(`Dining_chair_N${i+1}`, x, 3.85, 'south', 'Furniture_Dining');
@@ -630,6 +636,7 @@ function buildFurniture() {
   const pen = assembly('Dining_pendant', 'Lighting_Fixtures');
   partCyl(pen, '_cord', [2.4, 3.1, FFL + 2.30], 0.01, 0.80, M.metal);
   partBox(pen, '_lamp', [2.4, 3.1, FFL + 1.85], [0.70, 0.30, 0.20], M.metal);
+  setAnchor(pen, 2.4, 3.1, FFL + 2.0);
   fan('Dining_ceiling_fan', 4.0, 5.5);
 
   // === KITCHEN (against bath W wall = P6 inner face x=5.925)
@@ -638,6 +645,7 @@ function buildFurniture() {
   partBox(kit, '_top',  [5.65, 1.0, FFL + 0.86], [0.62, 1.82, 0.04], M.counter);
   partBox(kit, '_sink', [5.65, 0.25, FFL + 0.83], [0.50, 0.40, 0.04], M.chrome);
   partBox(kit, '_stove',[5.65, 1.70, FFL + 0.88], [0.55, 0.55, 0.02], M.alu);
+  setAnchor(kit, 5.65, 1.0, FFL + 0.5);
   soloBox('Kitchen_range_hood', 'Furniture_Kitchen', [5.65, 1.70, FFL + 1.95], [0.62, 0.42, 0.40], M.alu);
   soloBox('Kitchen_upper_cabinets', 'Furniture_Kitchen', [5.50, 1.0, FFL + 1.85], [0.35, 1.80, 0.70], M.wood);
   // Fridge moved out of D6 entry path — now west of kitchen counter (counter at x=5.65)
@@ -648,6 +656,7 @@ function buildFurniture() {
   partBox(sh, '_tray', [7.57, 0.63, FFL + 0.025], [0.78, 0.78, 0.05], M.wt);
   partBox(sh, '_glassN', [7.57, 1.02, FFL + 1.05], [0.78, 0.01, 2.10], M.glass);
   partBox(sh, '_glassW', [7.18, 0.63, FFL + 1.05], [0.01, 0.78, 2.10], M.glass);
+  setAnchor(sh, 7.57, 0.63, FFL + 1.0);
   soloBox('Bath_sink', 'Furniture_Bath', [6.275, 0.4, FFL + 0.85], [0.40, 0.50, 0.18], M.porc);
   soloBox('Bath_mirror', 'Furniture_Bath', [6.10, 0.4, FFL + 1.65], [0.06, 0.50, 0.70], M.alu);
 
@@ -656,6 +665,7 @@ function buildFurniture() {
   partBox(toilet, '_tank', [8.75, 0.30, FFL + 0.55], [0.40, 0.20, 0.50], M.porc);
   partBox(toilet, '_bowl', [8.75, 0.65, FFL + 0.20], [0.40, 0.50, 0.40], M.porc);
   partBox(toilet, '_seat', [8.75, 0.65, FFL + 0.41], [0.36, 0.46, 0.03], M.porc);
+  setAnchor(toilet, 8.75, 0.5, FFL + 0.4);
   soloBox('WC_basin', 'Furniture_WC', [9.275, 1.475, FFL + 0.85], [0.25, 0.35, 0.15], M.porc);
 }
 
@@ -854,7 +864,7 @@ function buildSidebar() {
         btn.classList.toggle('hidden', !child.visible);
         if (selected === child && !child.visible) setSelected(null);
         if (child.userData?.wallId) rebuildWallById(child.userData.wallId);  // wall follows
-        if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+        if (typeof recordChange === 'function') recordChange();
       });
       row.querySelector('.ti-del').addEventListener('click', e => {
         e.stopPropagation();
@@ -862,7 +872,7 @@ function buildSidebar() {
         const wallId = child.userData?.wallId;
         deleteAssembly(child);
         if (wallId) rebuildWallById(wallId);
-        if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+        if (typeof recordChange === 'function') recordChange();
       });
       tree.appendChild(row);
     });
@@ -881,7 +891,7 @@ function buildSidebar() {
     hdr.querySelector('input').addEventListener('change', (e) => {
       group.visible = e.target.checked;
       if (selected && !e.target.checked && findLayerOf(selected) === name) setSelected(null);
-      if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+      if (typeof recordChange === 'function') recordChange();
     });
 
     layersEl.appendChild(wrap);
@@ -949,7 +959,7 @@ document.getElementById('rebuild').addEventListener('click', () => {
   setSelected(null);
   buildVilla();
   buildSidebar();
-  if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+  if (typeof recordChange === 'function') recordChange();
 });
 
 function showSelection(g) {
@@ -985,28 +995,28 @@ function showSelection(g) {
       g.position[ax] = parseFloat(e.target.value);
       if (selectionHelper) selectionHelper.update();
       queueWallRebuild();
-      if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+      if (typeof recordChange === 'function') recordChange();
     });
     sel.querySelector(`#sel-s${ax}`).addEventListener('input', e => {
       const v = parseFloat(e.target.value);
       if (v > 0.01) {
         g.scale[ax] = v;
         if (selectionHelper) selectionHelper.update();
-        if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+        if (typeof recordChange === 'function') recordChange();
       }
     });
   });
   sel.querySelector('#sel-rz').addEventListener('input', e => {
     g.rotation.z = THREE.MathUtils.degToRad(parseFloat(e.target.value));
     if (selectionHelper) selectionHelper.update();
-    if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+    if (typeof recordChange === 'function') recordChange();
   });
   sel.querySelector('#sel-vis').addEventListener('click', () => {
     g.visible = !g.visible;
     if (g.userData?.wallId) rebuildWallById(g.userData.wallId);  // wall fills hole when door hidden
     showSelection(g);
     buildSidebar();
-    if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+    if (typeof recordChange === 'function') recordChange();
   });
   sel.querySelector('#sel-dup').addEventListener('click', () => {
     const clone = g.clone(true);
@@ -1018,14 +1028,14 @@ function showSelection(g) {
     if (clone.userData?.wallId) rebuildWallById(clone.userData.wallId);  // new opening
     buildSidebar();
     setSelected(clone);
-    if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+    if (typeof recordChange === 'function') recordChange();
   });
   sel.querySelector('#sel-del').addEventListener('click', () => {
     if (!confirm(`Delete "${g.name}"?`)) return;
     const wallId = g.userData?.wallId;
     deleteAssembly(g);
     if (wallId) rebuildWallById(wallId);  // wall fills hole
-    if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+    if (typeof recordChange === 'function') recordChange();
   });
 }
 
@@ -1163,6 +1173,55 @@ function scheduleAutoSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveLocal, 400);
 }
+
+// === UNDO / REDO ===
+const undoStack = [];
+const redoStack = [];
+const HISTORY_LIMIT = 50;
+let suppressHistory = false;
+let historyTimer = null;
+
+function pushHistory() {
+  if (suppressHistory) return;
+  const snap = JSON.stringify(snapshotState());
+  if (undoStack.length && undoStack[undoStack.length - 1] === snap) return;
+  undoStack.push(snap);
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+}
+
+function scheduleHistoryPush() {
+  clearTimeout(historyTimer);
+  historyTimer = setTimeout(pushHistory, 300);
+}
+
+function undo() {
+  if (undoStack.length < 2) return;
+  const current = undoStack.pop();
+  redoStack.push(current);
+  const prev = undoStack[undoStack.length - 1];
+  suppressHistory = true;
+  try { restoreState(JSON.parse(prev)); } finally { suppressHistory = false; }
+  saveLocal();
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  const next = redoStack.pop();
+  undoStack.push(next);
+  suppressHistory = true;
+  try { restoreState(JSON.parse(next)); } finally { suppressHistory = false; }
+  saveLocal();
+}
+
+// recordChange() = bump auto-save AND queue a history snapshot
+function recordChange() {
+  scheduleAutoSave();
+  scheduleHistoryPush();
+}
+
+window.undo = undo;
+window.redo = redo;
 
 // Hook into the transform gizmo's drag end
 transform.addEventListener('objectChange', scheduleAutoSave);
