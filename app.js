@@ -405,27 +405,58 @@ function buildVilla() {
   slider('D6_main_entry', 4.0,   0,      1.5, 2.4, 'y',         'EW_S_south_wall');
 
   // === WINDOWS — also tagged with their wall ===
-  // Renders a casement matching the reference photo: chunky black aluminum
-  // frame with a 3×3 grid (2 vertical mullions + 2 horizontal mullions = 9 panes)
-  // for our standard 2.5×2.6 m windows. Mullions are AS THICK as the outer
-  // frame and slightly proud of the wall surface so they read clearly.
-  function casement(name, x, y, w, h, sill, dirn, wallId) {
+  // Renders a casement matching the reference photo:
+  //   - Outer chunky black aluminum frame
+  //   - 2 full-height vertical mullions → 3 columns
+  //   - 2 horizontal mullions, but only spanning the LEFT and RIGHT columns
+  //     (not the centre) — so the centre is one TALL RECTANGLE pane and the
+  //     side columns are each 3 stacked squares (3-3-3 layout)
+  //
+  // The `sill` parameter is "metres above finished floor level" (FFL). The
+  // function converts to absolute Z internally — earlier code mistakenly used
+  // it as absolute Z, which put windows nearly at floor level.
+  function casement(name, x, y, w, h, sillAFFL, dirn, wallId) {
     const a = assembly(name, 'Windows');
+    const sill = FFL + sillAFFL;        // absolute Z of bottom of window opening
     Object.assign(a.userData, { wallId, openingW: w, openingSill: sill, openingTop: sill + h, openingDirn: dirn });
     const z = sill + h / 2;
     // Chunkier frame (matches reference) — face width 70 mm, depth 100 mm
     const fw = 0.07, fd = 0.10;
     // Mullions match outer frame thickness so the grid reads clearly
     const mw = fw, md = fd;
-    // Grid based on window size
-    // wide enough → 2 vertical mullions (3 cols), else 1 (2 cols), else 0
+    // Number of vertical mullions (full height): 2 for wide, 1 for medium, 0 for narrow
     const nVert  = w >= 1.5 ? 2 : (w >= 1.0 ? 1 : 0);
-    // tall enough → 2 horizontal mullions (3 rows), else 1, else 0
+    // Number of horizontal mullions (in side columns only): 2 for tall, 1 for medium, 0 short
     const nHoriz = h >= 1.5 ? 2 : (h >= 1.0 ? 1 : 0);
-    const vertOffs  = [];
-    for (let i = 1; i <= nVert;  i++) vertOffs.push(-w/2 + (w * i) / (nVert + 1));
+    // Vertical-mullion centre offsets along the width axis
+    const vertOffs = [];
+    for (let i = 1; i <= nVert; i++) vertOffs.push(-w/2 + (w * i) / (nVert + 1));
+    // Horizontal-mullion Z heights
     const horizZs = [];
     for (let i = 1; i <= nHoriz; i++) horizZs.push(sill + (h * i) / (nHoriz + 1));
+
+    // Helper — left/right side-column horizontal-mullion segments. Each segment
+    // spans from the outer frame to the nearest vertical mullion, so the centre
+    // column stays unbroken (= the tall rectangle pane).
+    function sideColumnSpans() {
+      if (nVert < 2) {
+        // Not enough vertical mullions to define a centre column → segments
+        // run full width.
+        return [{ centerOff: 0, len: w }];
+      }
+      const innerL = vertOffs[0];                       // negative
+      const innerR = vertOffs[vertOffs.length - 1];     // positive
+      const leftLen  = innerL - (-w/2) - mw;            // outer frame face → vertical mullion face
+      const rightLen = (w/2) - innerR - mw;
+      const leftCenter  = (-w/2 + innerL) / 2;
+      const rightCenter = (w/2 + innerR) / 2;
+      return [
+        { centerOff: leftCenter,  len: leftLen },
+        { centerOff: rightCenter, len: rightLen },
+      ];
+    }
+    const segs = sideColumnSpans();
+
     if (dirn === 'y') {
       // Window in N/S wall — width spans X
       partBox(a, '_FrT', [x, y, sill + h + fw/2], [w + 2*fw, fd, fw], M.winFrame);
@@ -436,7 +467,9 @@ function buildVilla() {
         partBox(a, `_VMull${i+1}`, [x + dx, y, z], [mw, md, h], M.winFrame);
       });
       horizZs.forEach((zh, i) => {
-        partBox(a, `_HMull${i+1}`, [x, y, zh], [w, md, mw], M.winFrame);
+        segs.forEach((s, j) => {
+          partBox(a, `_HMull${i+1}_${j+1}`, [x + s.centerOff, y, zh], [s.len, md, mw], M.winFrame);
+        });
       });
       partBox(a, '_Glass', [x, y, z], [w - 0.05, 0.025, h - 0.05], M.glass);
       partBox(a, '_Sill', [x, y - 0.06, sill - 0.06], [w + 0.20, 0.22, 0.06], M.plinth);
@@ -450,18 +483,20 @@ function buildVilla() {
         partBox(a, `_VMull${i+1}`, [x, y + dy, z], [md, mw, h], M.winFrame);
       });
       horizZs.forEach((zh, i) => {
-        partBox(a, `_HMull${i+1}`, [x, y, zh], [md, w, mw], M.winFrame);
+        segs.forEach((s, j) => {
+          partBox(a, `_HMull${i+1}_${j+1}`, [x, y + s.centerOff, zh], [md, s.len, mw], M.winFrame);
+        });
       });
       partBox(a, '_Glass', [x, y, z], [0.025, w - 0.05, h - 0.05], M.glass);
       const off = x < cx ? -0.06 : 0.06;
       partBox(a, '_Sill', [x + off, y, sill - 0.06], [0.22, w + 0.20, 0.06], M.plinth);
     }
-    // Anchor to window sill so SZ stretches upward
     setAnchor(a, x, y, sill);
     return a;
   }
-  function louver(name, x, y, w, h, sill, dirn, wallId) {
+  function louver(name, x, y, w, h, sillAFFL, dirn, wallId) {
     const a = assembly(name, 'Windows');
+    const sill = FFL + sillAFFL;        // sillAFFL is metres above FFL
     Object.assign(a.userData, { wallId, openingW: w, openingSill: sill, openingTop: sill + h, openingDirn: dirn });
     const z = sill + h / 2;
     const fw = 0.04, fd = 0.06;
