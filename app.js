@@ -41,12 +41,15 @@ orbit.minDistance = 2;
 orbit.maxDistance = 80;
 
 // === LIGHTING ===
-const sun = new THREE.DirectionalLight(0xfff0d0, 2.2);
-sun.position.set(-12, -6, 16);
+// Primary sun — moved high overhead and slightly north so it strikes the
+// north-tilted shed roof + solar panels closer to perpendicular (was SW
+// at low angle, which made panels look black).
+const sun = new THREE.DirectionalLight(0xfff0d0, 2.4);
+sun.position.set(4, 9, 22);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.near = 0.5;
-sun.shadow.camera.far = 60;
+sun.shadow.camera.far = 80;
 sun.shadow.camera.left = -25;
 sun.shadow.camera.right = 25;
 sun.shadow.camera.top = 25;
@@ -55,8 +58,18 @@ sun.shadow.bias = -0.0005;
 sun.target.position.set(4.75, 5.5, 0);
 scene.add(sun);
 scene.add(sun.target);
-scene.add(new THREE.HemisphereLight(0xb6d3ff, 0x4d5b3d, 0.55));
-scene.add(new THREE.AmbientLight(0xffffff, 0.18));
+
+// Secondary fill — high directional from the south so the south gable
+// + roof underside pick up some bounce, and the array is never fully
+// in shadow when orbited.
+const fill = new THREE.DirectionalLight(0xeaf2ff, 0.65);
+fill.position.set(4, -10, 16);
+fill.target.position.set(4.75, 5.5, 0);
+scene.add(fill);
+scene.add(fill.target);
+
+scene.add(new THREE.HemisphereLight(0xc8dcff, 0x4d5b3d, 0.85));   // brighter sky bounce
+scene.add(new THREE.AmbientLight(0xffffff, 0.32));                // raised ambient floor
 
 // === MATERIALS ===
 const hex = (h) => new THREE.Color(h);
@@ -85,7 +98,15 @@ const M = {
   metal:  new THREE.MeshStandardMaterial({ color: hex(0x4D4D50), roughness: 0.4, metalness: 0.7 }),
   rug:    new THREE.MeshStandardMaterial({ color: hex(0x8C5642), roughness: 0.95 }),
   mountain:new THREE.MeshStandardMaterial({ color: hex(0x4F5C68), roughness: 0.95 }),
-  pv:     new THREE.MeshStandardMaterial({ color: hex(0x1A2C5B), roughness: 0.10, metalness: 0.4 }),
+  // Solar PV: brighter blue, low metalness, slight self-emissive so panels
+  // read clearly even when the sun grazes them at a low angle.
+  pv:     new THREE.MeshStandardMaterial({
+    color: hex(0x2D4480),
+    roughness: 0.45,
+    metalness: 0.05,
+    emissive: hex(0x0E1830),
+    emissiveIntensity: 0.4,
+  }),
 };
 
 // === LAYERS ===
@@ -434,7 +455,7 @@ function buildVilla() {
   casement('W3_BR1_E',    p.envX, 5.75, 2.0, 2.2, 0.6, 'x', 'EW_E_east_wall');
   casement('W4_dining_W', 0,      5,    2.5, 2.6, 0.5, 'x', 'EW_W_west_wall');   // mountain — near floor-to-ceiling
   casement('W5_dining_W', 0,      2,    2.5, 2.6, 0.5, 'x', 'EW_W_west_wall');
-  casement('W6_dining_S', 3.0,    0,    1.2, 1.6, 0.9, 'y', 'EW_S_south_wall');
+  casement('W6_dining_S', 1.5,    0,    2.5, 2.6, 0.5, 'y', 'EW_S_south_wall');   // matches W4/W5
   louver  ('W7_bath_S',   7.0,    0,    0.5, 0.6, 2.8, 'y', 'EW_S_south_wall');  // sill raised with new ceiling
   louver  ('W8_WC_S',     8.75,   0,    0.6, 0.6, 2.8, 'y', 'EW_S_south_wall');
 
