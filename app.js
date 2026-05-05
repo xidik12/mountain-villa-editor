@@ -85,6 +85,9 @@ const M = {
   wt:     new THREE.MeshStandardMaterial({ color: hex(0xB8B8B0), roughness: 0.3 }),
   wood:   new THREE.MeshStandardMaterial({ color: hex(0xA0703B), roughness: 0.5 }),
   alu:    new THREE.MeshStandardMaterial({ color: hex(0x3A3A3A), roughness: 0.4, metalness: 0.7 }),
+  // Matte near-black for window mullions/frames — reads cleanly against glass
+  // and against the white wall, like the reference photo.
+  winFrame: new THREE.MeshStandardMaterial({ color: hex(0x14161A), roughness: 0.55, metalness: 0.25 }),
   glass:  new THREE.MeshStandardMaterial({ color: hex(0xAECEE0), roughness: 0.05, transparent: true, opacity: 0.30 }),
   grass:  new THREE.MeshStandardMaterial({ color: hex(0x4F6F38), roughness: 0.95 }),
   paving: new THREE.MeshStandardMaterial({ color: hex(0x8C7A65), roughness: 0.85 }),
@@ -402,28 +405,50 @@ function buildVilla() {
   slider('D6_main_entry', 4.0,   0,      1.5, 2.4, 'y',         'EW_S_south_wall');
 
   // === WINDOWS — also tagged with their wall ===
+  // Renders a casement matching the reference photo: chunky black aluminum
+  // frame, 1 vertical mullion (2 columns), and 3 horizontal mullions on tall
+  // windows (4 rows of glass) — total 8 panes for a 2.5×2.6 window.
   function casement(name, x, y, w, h, sill, dirn, wallId) {
     const a = assembly(name, 'Windows');
     Object.assign(a.userData, { wallId, openingW: w, openingSill: sill, openingTop: sill + h, openingDirn: dirn });
     const z = sill + h / 2;
-    const fw = 0.05, fd = 0.08;
+    // Chunkier frame (matches reference) — face width 70 mm, depth 100 mm
+    const fw = 0.07, fd = 0.10;
+    // Internal mullion thickness (slightly slimmer than outer frame)
+    const mw = 0.05, md = 0.08;
+    // Decide how many horizontal mullions based on height
+    // h ≥ 1.8 → 3 horiz mullions (4 rows · matches reference photo)
+    // h ≥ 1.0 → 1 horiz mullion (2 rows)
+    // else      → 0 horiz mullions
+    const nHoriz = h >= 1.8 ? 3 : (h >= 1.0 ? 1 : 0);
+    const horizZs = [];
+    for (let i = 1; i <= nHoriz; i++) horizZs.push(sill + (h * i) / (nHoriz + 1));
+    const hasVMull = w >= 1.0;
     if (dirn === 'y') {
-      partBox(a, '_FrT', [x, y, sill + h + fw/2], [w + 2*fw, fd, fw], M.alu);
-      partBox(a, '_FrB', [x, y, sill - fw/2],     [w + 2*fw, fd, fw], M.alu);
-      partBox(a, '_FrL', [x - w/2 - fw/2, y, z], [fw, fd, h], M.alu);
-      partBox(a, '_FrR', [x + w/2 + fw/2, y, z], [fw, fd, h], M.alu);
-      if (w >= 1.0) partBox(a, '_Mull', [x, y, z], [fw, fd, h], M.alu);
-      partBox(a, '_Glass', [x, y, z], [w - 0.04, 0.025, h - 0.04], M.glass);
-      partBox(a, '_Sill', [x, y - 0.06, sill - 0.06], [w + 0.18, 0.20, 0.06], M.plinth);
+      // Window in N/S wall — width spans X
+      partBox(a, '_FrT', [x, y, sill + h + fw/2], [w + 2*fw, fd, fw], M.winFrame);
+      partBox(a, '_FrB', [x, y, sill - fw/2],     [w + 2*fw, fd, fw], M.winFrame);
+      partBox(a, '_FrL', [x - w/2 - fw/2, y, z], [fw, fd, h], M.winFrame);
+      partBox(a, '_FrR', [x + w/2 + fw/2, y, z], [fw, fd, h], M.winFrame);
+      if (hasVMull) partBox(a, '_VMull', [x, y, z], [mw, md, h], M.winFrame);
+      horizZs.forEach((zh, i) => {
+        partBox(a, `_HMull${i+1}`, [x, y, zh], [w, md, mw], M.winFrame);
+      });
+      partBox(a, '_Glass', [x, y, z], [w - 0.05, 0.025, h - 0.05], M.glass);
+      partBox(a, '_Sill', [x, y - 0.06, sill - 0.06], [w + 0.20, 0.22, 0.06], M.plinth);
     } else {
-      partBox(a, '_FrT', [x, y, sill + h + fw/2], [fd, w + 2*fw, fw], M.alu);
-      partBox(a, '_FrB', [x, y, sill - fw/2],     [fd, w + 2*fw, fw], M.alu);
-      partBox(a, '_FrL', [x, y - w/2 - fw/2, z], [fd, fw, h], M.alu);
-      partBox(a, '_FrR', [x, y + w/2 + fw/2, z], [fd, fw, h], M.alu);
-      if (w >= 1.0) partBox(a, '_Mull', [x, y, z], [fd, fw, h], M.alu);
-      partBox(a, '_Glass', [x, y, z], [0.025, w - 0.04, h - 0.04], M.glass);
+      // Window in W/E wall — width spans Y
+      partBox(a, '_FrT', [x, y, sill + h + fw/2], [fd, w + 2*fw, fw], M.winFrame);
+      partBox(a, '_FrB', [x, y, sill - fw/2],     [fd, w + 2*fw, fw], M.winFrame);
+      partBox(a, '_FrL', [x, y - w/2 - fw/2, z], [fd, fw, h], M.winFrame);
+      partBox(a, '_FrR', [x, y + w/2 + fw/2, z], [fd, fw, h], M.winFrame);
+      if (hasVMull) partBox(a, '_VMull', [x, y, z], [md, mw, h], M.winFrame);
+      horizZs.forEach((zh, i) => {
+        partBox(a, `_HMull${i+1}`, [x, y, zh], [md, w, mw], M.winFrame);
+      });
+      partBox(a, '_Glass', [x, y, z], [0.025, w - 0.05, h - 0.05], M.glass);
       const off = x < cx ? -0.06 : 0.06;
-      partBox(a, '_Sill', [x + off, y, sill - 0.06], [0.20, w + 0.18, 0.06], M.plinth);
+      partBox(a, '_Sill', [x + off, y, sill - 0.06], [0.22, w + 0.20, 0.06], M.plinth);
     }
     // Anchor to window sill so SZ stretches upward
     setAnchor(a, x, y, sill);
