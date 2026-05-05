@@ -166,3 +166,120 @@ html, body {
 #sidebar button.danger:hover {
   background: #5a2a2a; color: #fff;
 }
+
+/* ====== Mobile sidebar toggle (drawer) ====== */
+#sidebar-toggle {
+  display: none;                    /* visible only on small screens */
+  position: fixed;
+  top: 12px; right: 12px;
+  z-index: 1100;
+  width: 44px; height: 44px;
+  background: rgba(20, 22, 26, 0.92);
+  color: #fff; border: 1px solid #353a44; border-radius: 8px;
+  font-size: 22px; line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
+}
+#sidebar-toggle:active { background: #2f343d; }
+
+#sidebar-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1090;
+}
+#sidebar-backdrop.open { display: block; }
+
+/* ====== Tablet (≤900px): narrower sidebar ====== */
+@media (max-width: 900px) {
+  #app { grid-template-columns: 1fr 280px; }
+}
+
+/* ====== Mobile (≤640px): drawer, stacked, larger touch targets ====== */
+@media (max-width: 640px) {
+  #app {
+    display: block;                 /* full-screen canvas; drawer floats over */
+    height: 100vh;
+    height: 100dvh;                 /* respect mobile browser chrome */
+  }
+  #viewport {
+    width: 100vw;
+    height: 100vh; height: 100dvh;
+  }
+  #sidebar-toggle { display: flex; align-items: center; justify-content: center; }
+
+  #sidebar {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(86vw, 360px);
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+    z-index: 1095;
+    box-shadow: -6px 0 18px rgba(0, 0, 0, 0.4);
+    padding: 56px 18px 24px;        /* leave room for the toggle */
+    font-size: 14px;                /* bump base for legibility */
+  }
+  #sidebar.open { transform: translateX(0); }
+
+  /* Bigger touch targets — Apple HIG / Material both want 44px+ */
+  #sidebar input,
+  #sidebar button {
+    font-size: 14px;
+    padding: 10px 12px;
+    min-height: 40px;
+  }
+  #sidebar input[type="number"] {
+    width: 92px;
+    font-size: 14px;
+  }
+  #sidebar input[type="checkbox"] {
+    width: 18px; height: 18px;
+  }
+  #sidebar button.full { padding: 12px 14px; }
+  #sidebar button.mode { font-size: 13px; padding: 9px 6px; }
+
+  #sidebar h1 { font-size: 17px; }
+  #sidebar h2 { font-size: 12px; margin-top: 18px; }
+  #sidebar p, #sidebar p.small { font-size: 13px; }
+  #sidebar label { font-size: 13px; padding: 4px 0; }
+
+  /* Stack number-inputs onto their own line so they don't wrap awkwardly */
+  #sidebar label {
+    display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+  }
+  #sidebar label.inline {
+    flex-direction: row; align-items: center; gap: 8px;
+  }
+  #sidebar input[type="number"] { margin-left: 0; width: 100%; }
+
+  /* Layer rows + tree items get more vertical breathing room */
+  .layer-row { padding: 8px 6px; }
+  .tree-item { padding: 8px 8px 8px 10px; font-size: 12.5px; }
+  .ti-vis, .ti-del { width: 28px; height: 28px; font-size: 16px; }
+
+  /* Selection inputs: full width on mobile */
+  #selection input { width: 100%; }
+  #selection .field {
+    flex-direction: column; align-items: stretch; gap: 4px;
+    margin: 6px 0;
+  }
+  #selection .field span { width: auto; font-size: 11px; }
+
+  /* Hide text shortcuts hints (G/R/S/⌘Z) — irrelevant without a keyboard */
+  #sidebar section:last-child { display: none; }
+
+  /* Tooltip is hover-only — no point on touch */
+  #tooltip { display: none !important; }
+}
+
+/* ====== Disable hover states on touch devices ====== */
+@media (hover: none) {
+  #sidebar button:hover,
+  .layer-row:hover,
+  .tree-item:hover,
+  .ti-vis:hover,
+  .ti-del:hover {
+    background: inherit; color: inherit; border-color: inherit;
+  }
+}

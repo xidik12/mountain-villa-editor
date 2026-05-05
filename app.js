@@ -85,6 +85,7 @@ const M = {
   metal:  new THREE.MeshStandardMaterial({ color: hex(0x4D4D50), roughness: 0.4, metalness: 0.7 }),
   rug:    new THREE.MeshStandardMaterial({ color: hex(0x8C5642), roughness: 0.95 }),
   mountain:new THREE.MeshStandardMaterial({ color: hex(0x4F5C68), roughness: 0.95 }),
+  pv:     new THREE.MeshStandardMaterial({ color: hex(0x1A2C5B), roughness: 0.10, metalness: 0.4 }),
 };
 
 // === LAYERS ===
@@ -155,18 +156,34 @@ function setAnchor(group, ax, ay, az = 0) {
   group.position.set(ax, ay, az);
 }
 
-// === PARAMS (per plan-A-plumbing.svg: 9.5 × 11, dining-E strip 1.5 m thick) ===
+// === PARAMS — v6 (3.5 m floor-to-ceiling · BR row at y=7.5 · mono-pitch shed roof + solar) ===
+// Roof is a single plane that's HIGH on the south (over dining) and LOW on the north (over bedrooms).
+// The dining ceiling vaults up toward the south wall; bedrooms get flat ceilings + small attic.
 const params = {
   envX: 9.5, envY: 11.0,
-  wallTopZ: 3.25, wallBtmZ: 0.45,
-  peakZ: 5.45, ridgeY: 5.5,
-  ridgeXfromW: 1.4, ridgeXfromE: 1.4,
+  wallBtmZ: 0.45,
+  wallTopZ: 3.95,        // LOW edge — N wall top (3.5 m floor-to-ceiling minimum, also = bedroom ceiling)
+  wallTopS: 5.89,        // HIGH edge — S wall top, gable rises here. Roof slope = 10° down to north.
+  roofPitchDeg: 10,
+  // Legacy hip params kept so older code paths don't crash if referenced
+  peakZ: 5.89, ridgeY: 0, ridgeXfromW: 1.4, ridgeXfromE: 1.4,
   extWT: 0.20, intWT: 0.15,
   ovh: { n: 0.8, s: 0.8, e: 0.8, w: 1.2 },
   roofThick: 0.10,
-  P4_y: 3.5,
-  roofType: 'flat',   // 'flat' | 'hip'
-  parapetH: 0.30,     // height of perimeter parapet on flat roof
+  P2_y: 7.5,          // bedroom-row south wall (v6: was 7.0)
+  P4_y: 4.0,          // BR1 south / dining-E strip top (v6: was 3.5)
+  roofType: 'shed',   // v6 canonical: 'shed' | 'hip' | 'flat'
+  parapetH: 0.30,
+  // Solar PV — FULL-ROOF carpet. 48 × 410 W = 19.68 kW (massive — feeds villa, EV charger, grid export).
+  // Panels follow the 10° N-tilt of the shed roof. ~70 % of ideal yield vs perfect-S panels;
+  // the trade-off is paid back by the much larger area. For peak efficiency, tilted racks recommended (see spec § 9b).
+  pvPanels: 48,
+  pvCols: 8,          // 8 columns E-W × 1.134 m portrait = 9.07 m (fits 9.5 m envelope)
+  pvRows: 6,          // 6 rows N-S × 1.722 m portrait = 10.33 m (fits 11 m envelope)
+  pvPanelW: 1.134,    // along E-W (portrait orientation)
+  pvPanelH: 1.722,    // along slope (N-S)
+  pvCenterX: 4.75,    // envelope midpoint E-W
+  pvCenterY: 5.5,     // envelope midpoint N-S — array spans whole roof
 };
 
 function clearAllLayers() {
@@ -293,9 +310,9 @@ function buildVilla() {
     { id: 'EW_N_north_wall', layer: 'Walls_Exterior', axis: 'x', lineCoord: p.envY,    alongStart: -p.extWT/2, alongEnd: p.envX + p.extWT/2, thickness: p.extWT, mat: M.ext },
     { id: 'EW_W_west_wall',  layer: 'Walls_Exterior', axis: 'y', lineCoord: 0,         alongStart: -p.extWT/2, alongEnd: p.envY + p.extWT/2, thickness: p.extWT, mat: M.ext },
     { id: 'EW_E_east_wall',  layer: 'Walls_Exterior', axis: 'y', lineCoord: p.envX,    alongStart: -p.extWT/2, alongEnd: p.envY + p.extWT/2, thickness: p.extWT, mat: M.ext },
-    { id: 'P1_master_BR2',        layer: 'Walls_Interior', axis: 'y', lineCoord: 4,       alongStart: 7,       alongEnd: 11,        thickness: p.intWT, mat: M.int },
-    { id: 'P2_bedrooms_dining',   layer: 'Walls_Interior', axis: 'x', lineCoord: 7,       alongStart: 0,       alongEnd: p.envX,    thickness: p.intWT, mat: M.int },
-    { id: 'P3_dining_BR1',        layer: 'Walls_Interior', axis: 'y', lineCoord: 5.5,     alongStart: p.P4_y,  alongEnd: 7,         thickness: p.intWT, mat: M.int },
+    { id: 'P1_master_BR2',        layer: 'Walls_Interior', axis: 'y', lineCoord: 4,       alongStart: p.P2_y,  alongEnd: 11,        thickness: p.intWT, mat: M.int },
+    { id: 'P2_bedrooms_dining',   layer: 'Walls_Interior', axis: 'x', lineCoord: p.P2_y,  alongStart: 0,       alongEnd: p.envX,    thickness: p.intWT, mat: M.int },
+    { id: 'P3_dining_BR1',        layer: 'Walls_Interior', axis: 'y', lineCoord: 5.5,     alongStart: p.P4_y,  alongEnd: p.P2_y,    thickness: p.intWT, mat: M.int },
     { id: 'P4_BR1_diningEstrip',  layer: 'Walls_Interior', axis: 'x', lineCoord: p.P4_y,  alongStart: 5.5,     alongEnd: p.envX,    thickness: p.intWT, mat: M.int },
     { id: 'P5_diningEstrip_wet',  layer: 'Walls_Interior', axis: 'x', lineCoord: 2,       alongStart: 6,       alongEnd: p.envX,    thickness: p.intWT, mat: M.int },
     { id: 'P6_kitchen_bath',      layer: 'Walls_Interior', axis: 'y', lineCoord: 6,       alongStart: 0,       alongEnd: 2,         thickness: p.intWT, mat: M.int },
@@ -354,14 +371,14 @@ function buildVilla() {
     return a;
   }
 
-  // Door schedule per plumbing.svg
-  door('D1_master_door',  2.0,   7.0,  0.9, 2.1, 'y', M.wood, 'P2_bedrooms_dining');
-  door('D2_BR2_door',     4.75,  7.0,  0.9, 2.1, 'y', M.wood, 'P2_bedrooms_dining');
-  door('D3_BR1_door',     5.5,   6.35, 0.9, 2.1, 'x', M.wood, 'P3_dining_BR1');
-  door('D4_bath_door',    7.0,   2.0,  0.8, 2.1, 'y', M.trim, 'P5_diningEstrip_wet');
-  door('D5_WC_door',      8.75,  2.0,  0.7, 2.1, 'y', M.trim, 'P5_diningEstrip_wet');
-  door('D7_service_door', p.envX, 2.75, 0.9, 2.1, 'x', M.wood, 'EW_E_east_wall');   // moved to middle of dining-E strip (was 2.5)
-  slider('D6_main_entry', 4.0,   0,    1.5, 2.1, 'y',         'EW_S_south_wall');
+  // Door schedule (v6 — taller leaves 2.4 m for 3.5 m ceiling)
+  door('D1_master_door',  2.0,   p.P2_y, 0.9, 2.4, 'y', M.wood, 'P2_bedrooms_dining');
+  door('D2_BR2_door',     4.75,  p.P2_y, 0.9, 2.4, 'y', M.wood, 'P2_bedrooms_dining');
+  door('D3_BR1_door',     5.5,   6.85,   0.9, 2.4, 'x', M.wood, 'P3_dining_BR1');     // v6: NW corner of BR1 (was 6.35)
+  door('D4_bath_door',    7.0,   2.0,    0.8, 2.4, 'y', M.trim, 'P5_diningEstrip_wet');
+  door('D5_WC_door',      8.75,  2.0,    0.7, 2.4, 'y', M.trim, 'P5_diningEstrip_wet');
+  door('D7_service_door', p.envX, 3.0,   0.9, 2.4, 'x', M.wood, 'EW_E_east_wall');    // mid of widened dining-E strip
+  slider('D6_main_entry', 4.0,   0,      1.5, 2.4, 'y',         'EW_S_south_wall');
 
   // === WINDOWS — also tagged with their wall ===
   function casement(name, x, y, w, h, sill, dirn, wallId) {
@@ -411,37 +428,41 @@ function buildVilla() {
     return a;
   }
 
-  // Window schedule. Dining windows tall (sill 0.5, h 2.45 → top 2.95, leaves 30cm for drape rod).
-  casement('W1_master_W', 0,      9, 1.5, 1.2,  1.0, 'x', 'EW_W_west_wall');
-  casement('W2_BR2_E',    p.envX, 9, 1.5, 1.2,  1.0, 'x', 'EW_E_east_wall');
-  casement('W3_BR1_E',    p.envX, 5, 1.5, 1.2,  1.0, 'x', 'EW_E_east_wall');
-  casement('W4_dining_W', 0,      5, 2.5, 2.45, 0.5, 'x', 'EW_W_west_wall');   // mountain — floor to near-ceiling
-  casement('W5_dining_W', 0,      2, 2.5, 2.45, 0.5, 'x', 'EW_W_west_wall');   // mountain — floor to near-ceiling
-  casement('W6_dining_S', 1.55,   0, 1.2, 2.45, 0.5, 'y', 'EW_S_south_wall'); // dining south — tall too
-  louver  ('W7_bath_S',   7.0,    0, 0.5, 0.6,  1.8, 'y', 'EW_S_south_wall');
-  louver  ('W8_WC_S',     8.75,   0, 0.6, 0.6,  1.8, 'y', 'EW_S_south_wall');
+  // Window schedule (v6 — modern villa style, taller bedroom windows, near floor-to-ceiling dining)
+  casement('W1_master_W', 0,      9.25, 2.0, 2.2, 0.6, 'x', 'EW_W_west_wall');
+  casement('W2_BR2_E',    p.envX, 9.25, 2.0, 2.2, 0.6, 'x', 'EW_E_east_wall');
+  casement('W3_BR1_E',    p.envX, 5.75, 2.0, 2.2, 0.6, 'x', 'EW_E_east_wall');
+  casement('W4_dining_W', 0,      5,    2.5, 2.6, 0.5, 'x', 'EW_W_west_wall');   // mountain — near floor-to-ceiling
+  casement('W5_dining_W', 0,      2,    2.5, 2.6, 0.5, 'x', 'EW_W_west_wall');
+  casement('W6_dining_S', 3.0,    0,    1.2, 1.6, 0.9, 'y', 'EW_S_south_wall');
+  louver  ('W7_bath_S',   7.0,    0,    0.5, 0.6, 2.8, 'y', 'EW_S_south_wall');  // sill raised with new ceiling
+  louver  ('W8_WC_S',     8.75,   0,    0.6, 0.6, 2.8, 'y', 'EW_S_south_wall');
 
   // === ROOF ===
-  if (p.roofType === 'flat') buildFlatRoof();
-  else buildHipRoof();
+  if (p.roofType === 'shed')      { buildShedRoof(); buildShedGables(); buildSolarPV(); }
+  else if (p.roofType === 'flat') buildFlatRoof();
+  else                            buildHipRoof();
 
-  // === CEILINGS ===
-  // Bedroom strip (master + BR2): y=7..11
-  soloBox('Ceil_Bedrooms',  'Ceilings', [cx, 9.0, 3.15], [p.envX, 4.0, 0.04], M.int);
-  // BR1: x=5.5..9.5 (4m), y=P4_y..7 (3.5m if P4_y=3.5)
-  const br1y = (p.P4_y + 7) / 2;
-  const br1h = 7 - p.P4_y;
-  soloBox('Ceil_BR1',       'Ceilings', [7.5, br1y, 3.15], [4.0, br1h, 0.04], M.int);
-  // Dining-E strip: x=6..9.5 (3.5m), y=2..P4_y (1.5m if P4_y=3.5)
+  // === CEILINGS (v6 — flat at +3.95 for habitable rooms, +3.35 for wet)
+  // Bedroom strip (master + BR2): y=P2_y..11 (3.5 m N-S in v6)
+  const brDepth = 11 - p.P2_y;
+  const brCy = (p.P2_y + 11) / 2;
+  soloBox('Ceil_Bedrooms',  'Ceilings', [cx, brCy, 3.95], [p.envX, brDepth, 0.04], M.int);
+  // BR1: x=5.5..9.5, y=P4_y..P2_y
+  const br1y = (p.P4_y + p.P2_y) / 2;
+  const br1h = p.P2_y - p.P4_y;
+  soloBox('Ceil_BR1',       'Ceilings', [7.5, br1y, 3.95], [4.0, br1h, 0.04], M.int);
+  // Dining-E strip: x=6..9.5, y=2..P4_y
   const stripY = (2 + p.P4_y) / 2;
   const stripH = p.P4_y - 2;
-  soloBox('Ceil_DiningEstrip','Ceilings', [7.75, stripY, 3.15], [3.5, stripH, 0.04], M.int);
-  // Dining-NW under west hip slope: x=0..1.4
-  soloBox('Ceil_Dining_NW', 'Ceilings', [0.7, 3.5, 3.15], [1.4, 7.0, 0.04], M.int);
-  // Bath (2×2) and WC (1.5×2) — flat at +2.6
-  soloBox('Ceil_Bath',      'Ceilings', [7.0, 1.0, 2.60], [1.825, 1.825, 0.04], M.int);
-  soloBox('Ceil_WC',        'Ceilings', [8.75, 1.0, 2.60], [1.325, 1.825, 0.04], M.int);
-  if (params.roofType === 'hip') buildVault();
+  soloBox('Ceil_DiningEstrip','Ceilings', [7.75, stripY, 3.95], [3.5, stripH, 0.04], M.int);
+  // Bath (2×2) and WC (1.5×2) — flat at +3.35
+  soloBox('Ceil_Bath',      'Ceilings', [7.0, 1.0, 3.35], [1.825, 1.825, 0.04], M.int);
+  soloBox('Ceil_WC',        'Ceilings', [8.75, 1.0, 3.35], [1.325, 1.825, 0.04], M.int);
+  // Dining ceiling — vaulted under shed slope (visible in 'shed' mode); flat in 'flat' mode
+  if (params.roofType === 'shed') buildShedVault();
+  else if (params.roofType === 'hip') buildVault();
+  else soloBox('Ceil_Dining', 'Ceilings', [cx, p.P2_y/2, 3.95], [p.envX, p.P2_y, 0.04], M.int);
 
   // === TRIM ===
   soloBox('Beam_S', 'Trim_Eaves', [cx, 0,        p.wallTopZ + 0.02], [p.envX + 0.2, 0.25, 0.04], M.trim);
@@ -540,8 +561,180 @@ function buildHipRoof() {
   partBox(a, '_ridge_cap', [(rxW + rxE)/2, ry, peakTop + 0.04], [rxE - rxW + 0.2, 0.18, 0.08], M.roof);
 }
 
+// === SHED (mono-pitch) ROOF — single inclined plane, HIGH at S (over dining), LOW at N (over bedrooms) ===
+function buildShedRoof() {
+  const p = params;
+  const ovh = p.ovh;
+  const xMin = -ovh.w, xMax = p.envX + ovh.e;
+  const yMin = -ovh.s, yMax = p.envY + ovh.n;
+  // S = high, N = low. Slope is consistent across overhangs (negative dz/dy).
+  const slope = (p.wallTopS - p.wallTopZ) / p.envY;        // ≈ 0.176 (10°)
+  const zSlope = (y) => p.wallTopS - slope * y;            // bottom-of-roof at given y (peak at y=0)
+  const t = p.roofThick;
+  // 8 corner verts: 4 underside + 4 topside
+  const v = [
+    // underside (bottom face)
+    [xMin, yMin, zSlope(yMin)],
+    [xMax, yMin, zSlope(yMin)],
+    [xMax, yMax, zSlope(yMax)],
+    [xMin, yMax, zSlope(yMax)],
+    // topside (offset perpendicular-ish; close enough at small angles to add t straight up)
+    [xMin, yMin, zSlope(yMin) + t],
+    [xMax, yMin, zSlope(yMin) + t],
+    [xMax, yMax, zSlope(yMax) + t],
+    [xMin, yMax, zSlope(yMax) + t],
+  ];
+  const idx = [
+    // bottom (visible from below)
+    0, 2, 1,  0, 3, 2,
+    // top (visible from above)
+    4, 5, 6,  4, 6, 7,
+    // S edge
+    0, 1, 5,  0, 5, 4,
+    // N edge
+    3, 7, 6,  3, 6, 2,
+    // W edge
+    0, 4, 7,  0, 7, 3,
+    // E edge
+    1, 2, 6,  1, 6, 5,
+  ];
+  const verts = [];
+  v.forEach(p2 => verts.push(...p2));
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const a = assembly('Roof_main', 'Roof');
+  const m = new THREE.Mesh(geo, M.roof);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  m.name = 'Roof_shed_shell';
+  a.add(m);
+  // Fascia at N eave (low edge — most visible from rear/garden side)
+  partBox(a, '_fascia_N', [(xMin + xMax)/2, yMax + 0.02, zSlope(yMax) - 0.10], [xMax - xMin, 0.04, 0.20], M.trim);
+}
+
+// === GABLE WALLS — fill the gap between flat low wall tops and the sloping roof ===
+// HIGH side is south (over dining), so the south gable is the rectangular tall one.
+function buildShedGables() {
+  const p = params;
+  // South gable — rectangular wall above S wall, height = wallTopS - wallTopZ ≈ 1.94 m
+  const sh = p.wallTopS - p.wallTopZ;
+  const scz = (p.wallTopZ + p.wallTopS) / 2;
+  soloBox('Gable_S', 'Walls_Exterior',
+    [p.envX/2, 0, scz],
+    [p.envX + p.extWT, p.extWT, sh],
+    M.ext);
+  // East + West gables — triangular wedge, peak at S (z = wallTopS), low at N (z = wallTopZ)
+  function makeGableTri(xLine, name) {
+    const verts = [
+      xLine, 0,        p.wallTopS,    // top corner at S
+      xLine, p.envY,   p.wallTopZ,    // bottom corner at N (no extra height needed — flat with N wall)
+      xLine, 0,        p.wallTopZ,    // bottom corner at S (sits at low wall top, fills the wedge below ridge)
+    ];
+    const idx = [0, 1, 2,  0, 2, 1];   // both sides
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const wrap = assembly(name, 'Walls_Exterior');
+    const m = new THREE.Mesh(geo, M.ext);
+    m.name = name + '_face';
+    wrap.add(m);
+  }
+  makeGableTri(0,        'Gable_W');
+  makeGableTri(p.envX,   'Gable_E');
+}
+
+// === SOLAR PV ARRAY — full-roof carpet, lying flush along the shed slope ===
+function buildSolarPV() {
+  const p = params;
+  // Same slope direction as the shed roof (HIGH at S, LOW at N)
+  const slope = (p.wallTopS - p.wallTopZ) / p.envY;
+  const zSlope = (y) => p.wallTopS - slope * y;
+  const standoff = p.roofThick + 0.04;       // panel sits ~40 mm above roof skin
+  const cols = p.pvCols;
+  const rows = p.pvRows;
+  const totalW = cols * p.pvPanelW;
+  const totalH = rows * p.pvPanelH;
+  const x0 = p.pvCenterX - totalW / 2;
+  const y0 = p.pvCenterY - totalH / 2;
+  // Shed roof tilts down toward +y (north), so panel faces face up + slightly N
+  // (rotation about +x by -tilt to match dz/dy = -slope).
+  const tilt = Math.atan(slope);
+  const a = assembly('Solar_PV_array', 'Roof');
+  let n = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      n++;
+      const cx = x0 + c * p.pvPanelW + p.pvPanelW / 2;
+      const cy = y0 + r * p.pvPanelH + p.pvPanelH / 2;
+      const cz = zSlope(cy) + standoff;
+      const panel = partBox(a, `_panel${n}`,
+        [cx, cy, cz],
+        [p.pvPanelW - 0.02, p.pvPanelH - 0.02, 0.035],
+        M.pv);
+      panel.rotation.x = -tilt;
+    }
+  }
+  // Continuous mounting rails along E-W under each row of panels
+  for (let r = 0; r < rows; r++) {
+    const cy = y0 + r * p.pvPanelH + p.pvPanelH / 2;
+    const cz = zSlope(cy) + standoff - 0.025;
+    const rail = partBox(a, `_rail${r}`,
+      [p.pvCenterX, cy, cz],
+      [totalW + 0.12, 0.05, 0.035],
+      M.alu);
+    rail.rotation.x = -tilt;
+  }
+  setAnchor(a, p.pvCenterX, p.pvCenterY, zSlope(p.pvCenterY) + standoff);
+}
+
+// Dining vault for the SHED roof: peaks at S (over dining), drops linearly to BR row south wall (P2_y).
+function buildShedVault() {
+  const p = params;
+  const slope = (p.wallTopS - p.wallTopZ) / p.envY;
+  // Underside of roof drops 20 cm below the structural slope for finish + insulation
+  const ZUNDER = (y) => p.wallTopS - slope * y - 0.20;
+  // Dining main: x = 0..5.5, y = 0..P2_y (vaulted slope)
+  const x1 = 0, x2 = 5.5;
+  const y1 = 0, y2 = p.P2_y;
+  const verts = [
+    x1, y1, ZUNDER(y1),
+    x2, y1, ZUNDER(y1),
+    x2, y2, ZUNDER(y2),
+    x1, y2, ZUNDER(y2),
+  ];
+  const idx = [0, 1, 2,  0, 2, 3];
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const a = assembly('Ceil_Dining_Vault', 'Ceilings');
+  const m = new THREE.Mesh(geo, M.batten);
+  m.name = 'Ceil_Dining_Vault_face';
+  a.add(m);
+  // Dining-E strip already has flat ceiling. Above-strip portion (y=2..P4_y, x=5.5..envX) also vaults gently
+  const x3 = 5.5, x4 = p.envX;
+  const yA = 0, yB = p.P4_y;
+  const verts2 = [
+    x3, yA, ZUNDER(yA),
+    x4, yA, ZUNDER(yA),
+    x4, yB, ZUNDER(yB),
+    x3, yB, ZUNDER(yB),
+  ];
+  const geo2 = new THREE.BufferGeometry();
+  geo2.setAttribute('position', new THREE.Float32BufferAttribute(verts2, 3));
+  geo2.setIndex(idx);
+  geo2.computeVertexNormals();
+  const a2 = assembly('Ceil_DiningE_Vault', 'Ceilings');
+  const m2 = new THREE.Mesh(geo2, M.batten);
+  m2.name = 'Ceil_DiningE_Vault_face';
+  a2.add(m2);
+}
+
 function buildVault() {
-  // Per spec §10: dining vault peaks at +5.30 (ridge level), eave at +3.20
+  // (Legacy) Hip-roof dining vault, kept for backward compat
   const peakV = 5.30, eaveV = 3.20;
   const xMin = 1.4, xMax = 5.5;   // constrained to ridge x-range so it stays below the hipped roof slopes
   function make(name, vs) {
@@ -568,6 +761,7 @@ function buildVault() {
 // ========================================================================
 function buildFurniture() {
   const FFL = params.wallBtmZ;
+  const p = params;
 
   function bed(name, cx, cy, headDir, layer) {
     const a = assembly(name, layer);
@@ -631,33 +825,32 @@ function buildFurniture() {
 
   const P4y = params.P4_y;
 
-  // === MASTER (4×4, x=0-4, y=7-11)
-  bed('Master_bed', 2.0, 9.8, 'north', 'Furniture_Master');
-  nightstand('Master_nightstand_L', 1.05, 8.6, 'Furniture_Master');
-  nightstand('Master_nightstand_R', 2.95, 8.6, 'Furniture_Master');
-  wardrobe('Master_wardrobe', 2.0, 7.35, 'Furniture_Master', 2.2, 0.55, 2.2, 'ew');
-  dresser('Master_dresser', 3.65, 8.7, 'Furniture_Master', 0.5, 0.8, 1.0, 'ns');
-  roundChair('Master_reading_chair', 0.5, 9.3, 'Furniture_Master');
-  fan('Master_ceiling_fan', 2.0, 9.0);
+  // === MASTER BD3 (v6 — 4 × 3.5, x=0-4, y=7.5-11) — wardrobe relocated to east wall
+  bed('Master_bed', 2.0, 9.85, 'north', 'Furniture_Master');
+  nightstand('Master_nightstand_L', 0.85, 10.65, 'Furniture_Master', 0.4, 0.4, 0.6);
+  nightstand('Master_nightstand_R', 3.15, 10.65, 'Furniture_Master', 0.4, 0.4, 0.6);
+  // Wardrobe along east wall (P1) — was on south wall blocking D1 in v5
+  wardrobe('Master_wardrobe', 3.65, 8.475, 'Furniture_Master', 1.8, 0.55, 2.4, 'ns');
+  roundChair('Master_reading_chair', 0.5, 9.5, 'Furniture_Master');
+  fan('Master_ceiling_fan', 2.0, 9.25);
 
-  // === BR2 (5.5×4, x=4-9.5, y=7-11)
-  bed('BR2_bed', 6.75, 9.8, 'north', 'Furniture_BR2');
-  nightstand('BR2_nightstand_L', 5.8, 8.6, 'Furniture_BR2');
-  nightstand('BR2_nightstand_R', 7.7, 8.6, 'Furniture_BR2');
-  wardrobe('BR2_wardrobe', 6.75, 7.35, 'Furniture_BR2', 2.2, 0.55, 2.2, 'ew');
-  soloBox('BR2_desk', 'Furniture_BR2', [9.15, 8.7, FFL + 0.36], [0.5, 0.8, 0.72], M.wood);
-  roundChair('BR2_desk_chair', 9.0, 8.0, 'Furniture_BR2');
-  roundChair('BR2_sitting_chair', 4.5, 9.3, 'Furniture_BR2');
-  fan('BR2_ceiling_fan', 6.75, 9.0);
+  // === BR2 (v6 — 5.5 × 3.5, x=4-9.5, y=7.5-11)
+  bed('BR2_bed', 6.75, 9.85, 'north', 'Furniture_BR2');
+  nightstand('BR2_nightstand_L', 5.675, 10.65, 'Furniture_BR2', 0.4, 0.4, 0.6);
+  nightstand('BR2_nightstand_R', 7.85, 10.65, 'Furniture_BR2', 0.4, 0.4, 0.6);
+  wardrobe('BR2_wardrobe', 6.6, 7.85, 'Furniture_BR2', 2.2, 0.55, 2.4, 'ew');
+  soloBox('BR2_desk', 'Furniture_BR2', [9.075, 9.0, FFL + 0.375], [0.5, 0.8, 0.75], M.wood);
+  roundChair('BR2_desk_chair', 9.0, 8.45, 'Furniture_BR2');
+  roundChair('BR2_sitting_chair', 4.5, 9.5, 'Furniture_BR2');
+  fan('BR2_ceiling_fan', 6.75, 9.25);
 
-  // === BR1 (4 × 3.5, x=5.5-9.5, y=P4_y..7), bed E-W head W
-  // Centered at ((5.5+9.5)/2, (P4_y+7)/2) = (7.5, ~5.25)
-  const br1cy = (P4y + 7) / 2;
-  bed('BR1_bed', 6.575, br1cy, 'west', 'Furniture_BR1');
-  nightstand('BR1_nightstand', 8.7, P4y + 0.3, 'Furniture_BR1', 0.35, 0.35, 0.6);
-  wardrobe('BR1_wardrobe', 7.5, 6.65, 'Furniture_BR1', 2.2, 0.55, 2.2, 'ew');
-  dresser('BR1_dresser', 9.15, 6.3, 'Furniture_BR1', 0.5, 0.8, 1.0, 'ns');
-  fan('BR1_ceiling_fan', 7.0, br1cy);
+  // === BR1 (v6 — 4 × 3.5, x=5.5-9.5, y=4-7.5), bed E-W head W
+  const br1cy = (P4y + p.P2_y) / 2;
+  bed('BR1_bed', 6.575, 4.875, 'west', 'Furniture_BR1');
+  nightstand('BR1_nightstand', 7.875, 4.875, 'Furniture_BR1', 0.35, 0.35, 0.6);
+  wardrobe('BR1_wardrobe', 7.6, 7.15, 'Furniture_BR1', 2.2, 0.55, 2.4, 'ew');   // along N wall, clear of D3
+  dresser('BR1_dresser', 9.175, 6.4, 'Furniture_BR1', 0.5, 1.0, 1.0, 'ns');     // E wall
+  fan('BR1_ceiling_fan', 7.5, br1cy);
 
   // === DINING (L-shape main rect x=0..5.5, y=0..7)
   const dt = assembly('Dining_table', 'Furniture_Dining');
@@ -991,12 +1184,16 @@ document.getElementById('deselect').addEventListener('click', () => setSelected(
 document.getElementById('envX').value = params.envX;
 document.getElementById('envY').value = params.envY;
 document.getElementById('wallTopZ').value = params.wallTopZ;
-document.getElementById('peakZ').value = params.peakZ;
+document.getElementById('peakZ').value = params.wallTopS;        // shed: HIGH side; legacy: hip-roof peak
+document.getElementById('roofType').value = params.roofType;
 document.getElementById('rebuild').addEventListener('click', () => {
   params.envX = parseFloat(document.getElementById('envX').value);
   params.envY = parseFloat(document.getElementById('envY').value);
   params.wallTopZ = parseFloat(document.getElementById('wallTopZ').value);
-  params.peakZ = parseFloat(document.getElementById('peakZ').value);
+  // peakZ input now drives wallTopS (shed high side); also keep peakZ alias for hip-roof legacy
+  const peakInput = parseFloat(document.getElementById('peakZ').value);
+  params.wallTopS = peakInput;
+  params.peakZ = peakInput;
   params.roofType = document.getElementById('roofType').value;
   setSelected(null);
   buildVilla();
