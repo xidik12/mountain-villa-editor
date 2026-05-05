@@ -449,13 +449,13 @@ function buildVilla() {
     return a;
   }
 
-  // Window schedule (v6 — modern villa style, taller bedroom windows, near floor-to-ceiling dining)
-  casement('W1_master_W', 0,      9.25, 2.0, 2.2, 0.6, 'x', 'EW_W_west_wall');
-  casement('W2_BR2_E',    p.envX, 9.25, 2.0, 2.2, 0.6, 'x', 'EW_E_east_wall');
-  casement('W3_BR1_E',    p.envX, 5.75, 2.0, 2.2, 0.6, 'x', 'EW_E_east_wall');
-  casement('W4_dining_W', 0,      5,    2.5, 2.6, 0.5, 'x', 'EW_W_west_wall');   // mountain — near floor-to-ceiling
+  // Window schedule (v6 — ALL aboveground windows 2.5 x 2.6, sill 0.5 — uniform villa-style)
+  casement('W1_master_W', 0,      9.25, 2.5, 2.6, 0.5, 'x', 'EW_W_west_wall');
+  casement('W2_BR2_E',    p.envX, 9.25, 2.5, 2.6, 0.5, 'x', 'EW_E_east_wall');
+  casement('W3_BR1_E',    p.envX, 5.75, 2.5, 2.6, 0.5, 'x', 'EW_E_east_wall');
+  casement('W4_dining_W', 0,      5,    2.5, 2.6, 0.5, 'x', 'EW_W_west_wall');
   casement('W5_dining_W', 0,      2,    2.5, 2.6, 0.5, 'x', 'EW_W_west_wall');
-  casement('W6_dining_S', 1.5,    0,    2.5, 2.6, 0.5, 'y', 'EW_S_south_wall');   // matches W4/W5
+  casement('W6_dining_S', 1.5,    0,    2.5, 2.6, 0.5, 'y', 'EW_S_south_wall');
   louver  ('W7_bath_S',   7.0,    0,    0.5, 0.6, 2.8, 'y', 'EW_S_south_wall');  // sill raised with new ceiling
   louver  ('W8_WC_S',     8.75,   0,    0.6, 0.6, 2.8, 'y', 'EW_S_south_wall');
 
