@@ -406,31 +406,35 @@ function buildVilla() {
 
   // === WINDOWS — also tagged with their wall ===
   // Renders a casement matching the reference photo: chunky black aluminum
-  // frame, 1 vertical mullion (2 columns), and 3 horizontal mullions on tall
-  // windows (4 rows of glass) — total 8 panes for a 2.5×2.6 window.
+  // frame with a 3×3 grid (2 vertical mullions + 2 horizontal mullions = 9 panes)
+  // for our standard 2.5×2.6 m windows. Mullions are AS THICK as the outer
+  // frame and slightly proud of the wall surface so they read clearly.
   function casement(name, x, y, w, h, sill, dirn, wallId) {
     const a = assembly(name, 'Windows');
     Object.assign(a.userData, { wallId, openingW: w, openingSill: sill, openingTop: sill + h, openingDirn: dirn });
     const z = sill + h / 2;
     // Chunkier frame (matches reference) — face width 70 mm, depth 100 mm
     const fw = 0.07, fd = 0.10;
-    // Internal mullion thickness (slightly slimmer than outer frame)
-    const mw = 0.05, md = 0.08;
-    // Decide how many horizontal mullions based on height
-    // h ≥ 1.8 → 3 horiz mullions (4 rows · matches reference photo)
-    // h ≥ 1.0 → 1 horiz mullion (2 rows)
-    // else      → 0 horiz mullions
-    const nHoriz = h >= 1.8 ? 3 : (h >= 1.0 ? 1 : 0);
+    // Mullions match outer frame thickness so the grid reads clearly
+    const mw = fw, md = fd;
+    // Grid based on window size
+    // wide enough → 2 vertical mullions (3 cols), else 1 (2 cols), else 0
+    const nVert  = w >= 1.5 ? 2 : (w >= 1.0 ? 1 : 0);
+    // tall enough → 2 horizontal mullions (3 rows), else 1, else 0
+    const nHoriz = h >= 1.5 ? 2 : (h >= 1.0 ? 1 : 0);
+    const vertOffs  = [];
+    for (let i = 1; i <= nVert;  i++) vertOffs.push(-w/2 + (w * i) / (nVert + 1));
     const horizZs = [];
     for (let i = 1; i <= nHoriz; i++) horizZs.push(sill + (h * i) / (nHoriz + 1));
-    const hasVMull = w >= 1.0;
     if (dirn === 'y') {
       // Window in N/S wall — width spans X
       partBox(a, '_FrT', [x, y, sill + h + fw/2], [w + 2*fw, fd, fw], M.winFrame);
       partBox(a, '_FrB', [x, y, sill - fw/2],     [w + 2*fw, fd, fw], M.winFrame);
       partBox(a, '_FrL', [x - w/2 - fw/2, y, z], [fw, fd, h], M.winFrame);
       partBox(a, '_FrR', [x + w/2 + fw/2, y, z], [fw, fd, h], M.winFrame);
-      if (hasVMull) partBox(a, '_VMull', [x, y, z], [mw, md, h], M.winFrame);
+      vertOffs.forEach((dx, i) => {
+        partBox(a, `_VMull${i+1}`, [x + dx, y, z], [mw, md, h], M.winFrame);
+      });
       horizZs.forEach((zh, i) => {
         partBox(a, `_HMull${i+1}`, [x, y, zh], [w, md, mw], M.winFrame);
       });
@@ -442,7 +446,9 @@ function buildVilla() {
       partBox(a, '_FrB', [x, y, sill - fw/2],     [fd, w + 2*fw, fw], M.winFrame);
       partBox(a, '_FrL', [x, y - w/2 - fw/2, z], [fd, fw, h], M.winFrame);
       partBox(a, '_FrR', [x, y + w/2 + fw/2, z], [fd, fw, h], M.winFrame);
-      if (hasVMull) partBox(a, '_VMull', [x, y, z], [md, mw, h], M.winFrame);
+      vertOffs.forEach((dy, i) => {
+        partBox(a, `_VMull${i+1}`, [x, y + dy, z], [md, mw, h], M.winFrame);
+      });
       horizZs.forEach((zh, i) => {
         partBox(a, `_HMull${i+1}`, [x, y, zh], [md, w, mw], M.winFrame);
       });
