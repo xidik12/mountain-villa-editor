@@ -1623,8 +1623,12 @@ function restoreState(state) {
       });
     });
   }
-  // Remove default assemblies missing from state (= user deleted them previously)
-  Object.values(layers).forEach(g => {
+  // Remove default assemblies missing from state (= user deleted them previously).
+  // BUT skip structural + annotation layers — those are always rebuilt from
+  // params and should never be deleted by stale localStorage state.
+  const ALWAYS_REBUILT_LAYERS = new Set(['Columns', 'Beams', 'Construction_Annotations']);
+  Object.entries(layers).forEach(([layerName, g]) => {
+    if (ALWAYS_REBUILT_LAYERS.has(layerName)) return;
     [...g.children].forEach(c => {
       if (c.userData?.isAssembly && !survived.has(c.name)) {
         c.traverse(x => { if (x.geometry) x.geometry.dispose(); });
@@ -1634,12 +1638,14 @@ function restoreState(state) {
   });
   if (state.layerVisibility) {
     Object.entries(state.layerVisibility).forEach(([n, v]) => {
-      if (layers[n]) layers[n].visible = v;
+      if (layers[n] && !ALWAYS_REBUILT_LAYERS.has(n)) layers[n].visible = v;
     });
   }
   // After restoring all door/window positions, rebuild walls so cuts match
   rebuildAllWalls();
   buildSidebar();
+  // Re-apply view mode so structural layers + annotations follow the active tab
+  if (typeof applyViewMode === 'function') applyViewMode(currentView);
 }
 
 function saveLocal() {
