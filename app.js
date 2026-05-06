@@ -192,9 +192,12 @@ function setAnchor(group, ax, ay, az = 0) {
   group.position.set(ax, ay, az);
 }
 
-// === PARAMS — v6.2 (3.5 m floor-to-ceiling · FFL raised to +0.60 m for tropical flood protection · 11 columns · shed roof + solar) ===
-// Roof is a single plane that's HIGH on the south (over dining) and LOW on the north (over bedrooms).
-// The dining ceiling vaults up toward the south wall; bedrooms get flat ceilings + small attic.
+// === PARAMS — v6.4 canonical ===
+// 9.5 × 11 m envelope · 3.5 m floor-to-ceiling · FFL +0.60 m · walls 150/100 mm
+// 11 RC columns · shed roof at 5° (8.75 % slope) · 48 × 410 W full-roof solar PV.
+// Roof is a single plane HIGH on the south (over dining) and LOW on the north
+// (over bedrooms). Dining ceiling vaults up toward the south wall; bedrooms get
+// flat ceilings + small attic above.
 const params = {
   envX: 9.5, envY: 11.0,
   wallBtmZ: 0.60,        // FFL — 600 mm plinth (v6.2 tropical flood protection)
@@ -203,7 +206,7 @@ const params = {
   roofPitchDeg: 5,       // shallower roof per v6.3 — 8.75 % slope (was 10°/17.6 %)
   // Legacy hip params kept so older code paths don't crash if referenced
   peakZ: 5.06, ridgeY: 0, ridgeXfromW: 1.4, ridgeXfromE: 1.4,
-  extWT: 0.20, intWT: 0.15,
+  extWT: 0.15, intWT: 0.10,        // v6.4 — single-skin brick (was 0.20/0.15)
   ovh: { n: 0.8, s: 0.8, e: 0.8, w: 1.2 },
   roofThick: 0.10,
   P2_y: 7.5,          // bedroom-row south wall (v6: was 7.0)
