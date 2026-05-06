@@ -197,12 +197,12 @@ function setAnchor(group, ax, ay, az = 0) {
 // The dining ceiling vaults up toward the south wall; bedrooms get flat ceilings + small attic.
 const params = {
   envX: 9.5, envY: 11.0,
-  wallBtmZ: 0.60,        // FFL — raised from 0.45 to 0.60 (600 mm plinth) for tropical flood protection
-  wallTopZ: 4.10,        // LOW edge — N wall top (= FFL + 3.5 m floor-to-ceiling)
-  wallTopS: 6.04,        // HIGH edge — S wall top (= FFL + 3.5 + 1.94 m rise over 11 m at 10° pitch)
-  roofPitchDeg: 10,
+  wallBtmZ: 0.60,        // FFL — 600 mm plinth (v6.2 tropical flood protection)
+  wallTopZ: 4.10,        // LOW edge — N wall top
+  wallTopS: 5.06,        // HIGH edge — S wall top (= FFL + 3.5 + 0.96 m rise over 11 m at 5° pitch / 8.75 % slope)
+  roofPitchDeg: 5,       // shallower roof per v6.3 — 8.75 % slope (was 10°/17.6 %)
   // Legacy hip params kept so older code paths don't crash if referenced
-  peakZ: 6.04, ridgeY: 0, ridgeXfromW: 1.4, ridgeXfromE: 1.4,
+  peakZ: 5.06, ridgeY: 0, ridgeXfromW: 1.4, ridgeXfromE: 1.4,
   extWT: 0.20, intWT: 0.15,
   ovh: { n: 0.8, s: 0.8, e: 0.8, w: 1.2 },
   roofThick: 0.10,
