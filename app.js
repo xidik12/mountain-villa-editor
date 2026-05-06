@@ -599,6 +599,57 @@ function buildStructure() {
 
   // Lintels over each opening (compact RC bands above doors + windows)
   buildLintels();
+
+  // === BEAM + LINTEL LABELS (Construction view only) ===
+  // Ring beam labels — one near each side so it's readable from any orbit
+  const ringLabelZ = p.wallTopZ + 0.25;
+  ['Ring beam', 'Ring beam'].forEach((txt, i) => {
+    const lbl = makeTextSprite(txt, 1.6, '#cfe7f0');
+    lbl.position.set(i === 0 ? 1.5 : p.envX - 1.5, i === 0 ? -0.4 : p.envY + 0.4, ringLabelZ);
+    layers['Construction_Annotations'].add(lbl);
+  });
+  const tieLbl = makeTextSprite('Tie beam (P2)', 1.5, '#ffd6a0');
+  tieLbl.position.set(p.envX / 2, p.P2_y, p.wallTopZ + 0.20);
+  layers['Construction_Annotations'].add(tieLbl);
+
+  // === GHOST WALL OUTLINES (faint wireframe so lintels visually connect to openings) ===
+  buildGhostWalls();
+}
+
+// Wireframe outlines of every wall + opening so the structural beams/lintels
+// have visual context in Construction view (without hiding them).
+function buildGhostWalls() {
+  const p = params;
+  const wallTop = p.wallTopZ;
+  const wallBot = p.wallBtmZ;
+  const ghostMat = new THREE.LineBasicMaterial({
+    color: 0x9aa4b0, transparent: true, opacity: 0.35, depthTest: true,
+  });
+  const a = assembly('Ghost_walls_outline', 'Construction_Annotations');
+  function rectFrame(name, cx, cy, cz, sx, sy, sz) {
+    const g = new THREE.BoxGeometry(sx, sy, sz);
+    const edges = new THREE.EdgesGeometry(g);
+    const line = new THREE.LineSegments(edges, ghostMat);
+    line.position.set(cx, cy, cz);
+    line.name = name;
+    a.add(line);
+    g.dispose();
+  }
+  // Exterior walls
+  const ewT = p.extWT, eh = wallTop - wallBot, ecz = (wallTop + wallBot) / 2;
+  rectFrame('ghost_S', p.envX/2, 0,        ecz, p.envX + ewT, ewT, eh);
+  rectFrame('ghost_N', p.envX/2, p.envY,   ecz, p.envX + ewT, ewT, eh);
+  rectFrame('ghost_W', 0,        p.envY/2, ecz, ewT, p.envY + ewT, eh);
+  rectFrame('ghost_E', p.envX,   p.envY/2, ecz, ewT, p.envY + ewT, eh);
+  // Interior partitions (P1–P7)
+  const iwT = p.intWT;
+  rectFrame('ghost_P1', 4,        (p.P2_y + 11)/2, ecz, iwT, 11 - p.P2_y, eh);
+  rectFrame('ghost_P2', p.envX/2, p.P2_y,          ecz, p.envX, iwT, eh);
+  rectFrame('ghost_P3', 5.5,      (p.P4_y + p.P2_y)/2, ecz, iwT, p.P2_y - p.P4_y, eh);
+  rectFrame('ghost_P4', (5.5 + p.envX)/2, p.P4_y,  ecz, p.envX - 5.5, iwT, eh);
+  rectFrame('ghost_P5', (6 + p.envX)/2, 2,         ecz, p.envX - 6, iwT, eh);
+  rectFrame('ghost_P6', 6,        1,               ecz, iwT, 2, eh);
+  rectFrame('ghost_P7', 8,        1,               ecz, iwT, 2, eh);
 }
 
 function buildLintels() {
@@ -644,27 +695,49 @@ function buildLintels() {
   });
 }
 
-// Simple billboarded text sprite for Construction-view labels (C1, C2, etc.)
-function makeTextSprite(text, size = 0.5) {
+// Billboarded text sprite for Construction-view labels.
+// Short text (C1, etc.) → yellow circle. Longer text → wider rounded pill.
+function makeTextSprite(text, size = 0.5, bg = '#ffec64') {
   const canvas = document.createElement('canvas');
-  canvas.width = 256; canvas.height = 256;
+  const isShort = text.length <= 3;
+  const w = isShort ? 256 : 768;
+  const h = 256;
+  canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = 'rgba(255, 235, 100, 0.95)';
-  ctx.beginPath();
-  ctx.arc(128, 128, 110, 0, Math.PI * 2);
-  ctx.fill();
+  // Pill background
+  ctx.fillStyle = bg;
+  if (isShort) {
+    ctx.beginPath();
+    ctx.arc(w/2, h/2, h/2 - 18, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    const r = 60;
+    ctx.beginPath();
+    ctx.moveTo(20 + r, 30);
+    ctx.lineTo(w - 20 - r, 30);
+    ctx.arcTo(w - 20, 30, w - 20, 30 + r, r);
+    ctx.lineTo(w - 20, h - 30 - r);
+    ctx.arcTo(w - 20, h - 30, w - 20 - r, h - 30, r);
+    ctx.lineTo(20 + r, h - 30);
+    ctx.arcTo(20, h - 30, 20, h - 30 - r, r);
+    ctx.lineTo(20, 30 + r);
+    ctx.arcTo(20, 30, 20 + r, 30, r);
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.strokeStyle = '#1a1d22';
-  ctx.lineWidth = 8;
+  ctx.lineWidth = 6;
   ctx.stroke();
   ctx.fillStyle = '#1a1d22';
-  ctx.font = 'bold 110px -apple-system, sans-serif';
+  ctx.font = `bold ${isShort ? 130 : 100}px -apple-system, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, 128, 138);
+  ctx.fillText(text, w/2, h/2 + 6);
   const texture = new THREE.CanvasTexture(canvas);
   const mat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
   const sprite = new THREE.Sprite(mat);
-  sprite.scale.set(size, size, 1);
+  // Width-aware scale so wide pills stay readable
+  sprite.scale.set(size * (w / h), size, 1);
   sprite.name = `Label_${text}`;
   return sprite;
 }
@@ -1356,7 +1429,7 @@ const VIEW_PRESETS = {
            'Furniture_Master', 'Furniture_BR2', 'Furniture_BR1',
            'Furniture_Dining', 'Furniture_Kitchen', 'Furniture_Bath', 'Furniture_WC',
            'Lighting_Fixtures'],
-    hint: 'Construction: foundation + 9 RC columns (C1–C9) + ring beam + tie beam over P2 + 15 lintels. Click Finished to switch back.',
+    hint: 'Construction view: vertical orange shafts = 9 RC columns (C1–C9). Horizontal beams across the top = ring beam (perimeter). The single bar mid-height across the building = tie beam over partition P2. Short bars above each opening = 15 lintels (one per door + window). Faint grey wireframes show the wall outlines for context. Click Finished to switch back.',
   },
 };
 let currentView = 'finished';
