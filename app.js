@@ -558,16 +558,20 @@ function buildStructure() {
   const colBot = 0.05;                     // just above plinth top
   const colTop = p.wallTopZ + 0.05;        // ~5 cm proud of ring beam top
   const colSec = 0.25;                     // 250 × 250 RC
+  // 11 columns (v6.1 — added C10 + C11 after structural review caught two
+  // unsupported spans in the original 9-column layout).
   const cols = [
-    { id: 'C1', x: 0.10,    y: 0.10 },
-    { id: 'C2', x: p.envX - 0.10, y: 0.10 },
-    { id: 'C3', x: 0.10,    y: p.envY - 0.10 },
-    { id: 'C4', x: p.envX - 0.10, y: p.envY - 0.10 },
-    { id: 'C5', x: 4.75,    y: 0.10 },
-    { id: 'C6', x: 4.75,    y: p.envY - 0.10 },
-    { id: 'C7', x: 0.10,    y: 3.50 },
-    { id: 'C8', x: p.envX - 0.10, y: p.P2_y },
-    { id: 'C9', x: 0.10,    y: p.P2_y },
+    { id: 'C1',  x: 0.10,           y: 0.10           },
+    { id: 'C2',  x: p.envX - 0.10,  y: 0.10           },
+    { id: 'C3',  x: 0.10,           y: p.envY - 0.10  },
+    { id: 'C4',  x: p.envX - 0.10,  y: p.envY - 0.10  },
+    { id: 'C5',  x: 4.75,           y: 0.10           },
+    { id: 'C6',  x: 4.75,           y: p.envY - 0.10  },
+    { id: 'C7',  x: 0.10,           y: 3.50           },                 // W between mountain windows
+    { id: 'C8',  x: 0.10,           y: p.P2_y         },                 // W at P2 tie-in
+    { id: 'C9',  x: p.envX - 0.10,  y: p.P2_y         },                 // E at P2 tie-in
+    { id: 'C10', x: p.envX - 0.10,  y: 4.00, isNew: true },              // NEW E mid-pier (between D7 + W3)
+    { id: 'C11', x: 4.75,           y: p.P2_y, isNew: true },            // NEW P2 tie beam mid-span
   ];
   cols.forEach(c => {
     const a = assembly(`Column_${c.id}`, 'Columns');
@@ -1429,7 +1433,7 @@ const VIEW_PRESETS = {
            'Furniture_Master', 'Furniture_BR2', 'Furniture_BR1',
            'Furniture_Dining', 'Furniture_Kitchen', 'Furniture_Bath', 'Furniture_WC',
            'Lighting_Fixtures'],
-    hint: 'Construction view: vertical orange shafts = 9 RC columns (C1–C9). Horizontal beams across the top = ring beam (perimeter). The single bar mid-height across the building = tie beam over partition P2. Short bars above each opening = 15 lintels (one per door + window). Faint grey wireframes show the wall outlines for context. Click Finished to switch back.',
+    hint: 'Construction view: vertical orange shafts = 11 RC columns (C1–C11; C10 + C11 added in v6.1 to fix two unsupported beam spans). Horizontal bars at the top = ring beam (perimeter). The single bar across the middle = tie beam over P2 (now with mid-column C11). Short bars above each opening = 15 lintels (7 doors + 6 large windows + 2 louvers). Faint grey wireframes show the wall outlines. Click Finished to switch back.',
   },
 };
 let currentView = 'finished';
