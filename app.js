@@ -185,17 +185,17 @@ function setAnchor(group, ax, ay, az = 0) {
   group.position.set(ax, ay, az);
 }
 
-// === PARAMS — v6 (3.5 m floor-to-ceiling · BR row at y=7.5 · mono-pitch shed roof + solar) ===
+// === PARAMS — v6.2 (3.5 m floor-to-ceiling · FFL raised to +0.60 m for tropical flood protection · 11 columns · shed roof + solar) ===
 // Roof is a single plane that's HIGH on the south (over dining) and LOW on the north (over bedrooms).
 // The dining ceiling vaults up toward the south wall; bedrooms get flat ceilings + small attic.
 const params = {
   envX: 9.5, envY: 11.0,
-  wallBtmZ: 0.45,
-  wallTopZ: 3.95,        // LOW edge — N wall top (3.5 m floor-to-ceiling minimum, also = bedroom ceiling)
-  wallTopS: 5.89,        // HIGH edge — S wall top, gable rises here. Roof slope = 10° down to north.
+  wallBtmZ: 0.60,        // FFL — raised from 0.45 to 0.60 (600 mm plinth) for tropical flood protection
+  wallTopZ: 4.10,        // LOW edge — N wall top (= FFL + 3.5 m floor-to-ceiling)
+  wallTopS: 6.04,        // HIGH edge — S wall top (= FFL + 3.5 + 1.94 m rise over 11 m at 10° pitch)
   roofPitchDeg: 10,
   // Legacy hip params kept so older code paths don't crash if referenced
-  peakZ: 5.89, ridgeY: 0, ridgeXfromW: 1.4, ridgeXfromE: 1.4,
+  peakZ: 6.04, ridgeY: 0, ridgeXfromW: 1.4, ridgeXfromE: 1.4,
   extWT: 0.20, intWT: 0.15,
   ovh: { n: 0.8, s: 0.8, e: 0.8, w: 1.2 },
   roofThick: 0.10,
@@ -318,15 +318,22 @@ function buildVilla() {
   soloBox('Mountain_SW', 'Site', [-30, -5, 6], [8, 15, 12], M.mountain);
   soloBox('Mountain_NW', 'Site', [-30, p.envY + 5, 7], [8, 15, 14], M.mountain);
 
-  // === FOUNDATION ===
-  soloBox('FloorSlab', 'Foundation', [cx, cy, 0.40], [p.envX + 0.2, p.envY + 0.2, 0.10], M.floor);
-  soloBox('Plinth_S',  'Foundation', [cx, -0.075, 0.25], [p.envX + 0.3, 0.05, 0.40], M.plinth);
-  soloBox('Plinth_N',  'Foundation', [cx, p.envY + 0.075, 0.25], [p.envX + 0.3, 0.05, 0.40], M.plinth);
-  soloBox('Plinth_W',  'Foundation', [-0.075, cy, 0.25], [0.05, p.envY + 0.2, 0.40], M.plinth);
-  soloBox('Plinth_E',  'Foundation', [p.envX + 0.075, cy, 0.25], [0.05, p.envY + 0.2, 0.40], M.plinth);
+  // === FOUNDATION (v6.2 — plinth raised to 600 mm, FFL = +0.60 m) ===
+  // Slab top sits at FFL. Slab thickness 0.10 → slab centre Z = FFL - 0.05.
+  const slabTopZ = FFL;            // top of slab = FFL
+  const slabCenterZ = FFL - 0.05;  // slab is 100 mm thick
+  const plinthBotZ = 0.05;         // 5 cm above grade
+  const plinthCenterZ = (FFL + plinthBotZ) / 2;
+  const plinthH = FFL - plinthBotZ;
+  soloBox('FloorSlab', 'Foundation', [cx, cy, slabCenterZ], [p.envX + 0.2, p.envY + 0.2, 0.10], M.floor);
+  soloBox('Plinth_S',  'Foundation', [cx, -0.075, plinthCenterZ], [p.envX + 0.3, 0.05, plinthH], M.plinth);
+  soloBox('Plinth_N',  'Foundation', [cx, p.envY + 0.075, plinthCenterZ], [p.envX + 0.3, 0.05, plinthH], M.plinth);
+  soloBox('Plinth_W',  'Foundation', [-0.075, cy, plinthCenterZ], [0.05, p.envY + 0.2, plinthH], M.plinth);
+  soloBox('Plinth_E',  'Foundation', [p.envX + 0.075, cy, plinthCenterZ], [0.05, p.envY + 0.2, plinthH], M.plinth);
   // Wet floor overlays — Bath at (6-8, 0-2), WC at (8-9.5, 0-2)
-  soloBox('FloorTile_Bath', 'Foundation', [7.0,  1.0, 0.4525], [1.825, 1.825, 0.005], M.wet);
-  soloBox('FloorTile_WC',   'Foundation', [8.75, 1.0, 0.4525], [1.325, 1.825, 0.005], M.wet);
+  const wetTopZ = FFL + 0.0025;
+  soloBox('FloorTile_Bath', 'Foundation', [7.0,  1.0, wetTopZ], [1.825, 1.825, 0.005], M.wet);
+  soloBox('FloorTile_WC',   'Foundation', [8.75, 1.0, wetTopZ], [1.325, 1.825, 0.005], M.wet);
 
   // === STRUCTURAL CONCRETE (Columns + Beams — visible in Construction view) ===
   buildStructure();
@@ -408,7 +415,7 @@ function buildVilla() {
   door('D2_BR2_door',     4.75,  p.P2_y, 0.9, 2.4, 'y', M.wood, 'P2_bedrooms_dining');
   door('D3_BR1_door',     5.5,   6.85,   0.9, 2.4, 'x', M.wood, 'P3_dining_BR1');     // v6: NW corner of BR1 (was 6.35)
   door('D4_bath_door',    7.0,   2.0,    0.8, 2.4, 'y', M.trim, 'P5_diningEstrip_wet');
-  door('D5_WC_door',      8.75,  2.0,    0.7, 2.4, 'y', M.trim, 'P5_diningEstrip_wet');
+  door('D5_WC_door',      8.75,  2.0,    0.8, 2.4, 'y', M.trim, 'P5_diningEstrip_wet');   // v6.2: bumped 700→800 for accessibility
   door('D7_service_door', p.envX, 3.0,   0.9, 2.4, 'x', M.wood, 'EW_E_east_wall');    // mid of widened dining-E strip
   slider('D6_main_entry', 4.0,   0,      1.5, 2.4, 'y',         'EW_S_south_wall');
 
@@ -665,7 +672,7 @@ function buildLintels() {
     { id: 'D2', x: 4.75,   y: p.P2_y, axis: 'y', w: 0.9 },
     { id: 'D3', x: 5.5,    y: 6.85,   axis: 'x', w: 0.9 },
     { id: 'D4', x: 7.0,    y: 2.0,    axis: 'y', w: 0.8 },
-    { id: 'D5', x: 8.75,   y: 2.0,    axis: 'y', w: 0.7 },
+    { id: 'D5', x: 8.75,   y: 2.0,    axis: 'y', w: 0.8 },
     { id: 'D6', x: 4.0,    y: 0,      axis: 'y', w: 1.5 },
     { id: 'D7', x: p.envX, y: 3.0,    axis: 'x', w: 0.9 },
   ];
