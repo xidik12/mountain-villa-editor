@@ -101,21 +101,39 @@
   </div>
 
   <script>
-    // Mobile sidebar toggle (vanilla, no framework)
+    // Mobile sidebar drawer (vanilla, no framework)
     (function () {
       const tog = document.getElementById('sidebar-toggle');
       const sb = document.getElementById('sidebar');
       const bd = document.getElementById('sidebar-backdrop');
       if (!tog || !sb || !bd) return;
-      const close = () => { sb.classList.remove('open'); bd.classList.remove('open'); };
+      // Fire a resize event so the Three.js renderer recomputes the canvas size
+      // for the new layout state. The CSS animation lasts 250 ms so we re-fire
+      // again after the transition ends to lock the final dimensions.
+      const reflow = () => {
+        window.dispatchEvent(new Event('resize'));
+      };
+      const close = () => {
+        sb.classList.remove('open');
+        bd.classList.remove('open');
+        reflow();
+        setTimeout(reflow, 280);
+      };
+      const open = () => {
+        sb.classList.add('open');
+        bd.classList.add('open');
+      };
       tog.addEventListener('click', () => {
-        sb.classList.toggle('open');
-        bd.classList.toggle('open');
+        sb.classList.contains('open') ? close() : open();
       });
       bd.addEventListener('click', close);
-      // Close drawer on resize back to desktop so we don't leave it stuck
+      // Close on Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sb.classList.contains('open')) close();
+      });
+      // Close drawer if the window is resized back to desktop
       window.addEventListener('resize', () => {
-        if (window.innerWidth > 900) close();
+        if (window.innerWidth > 1024) close();
       });
     })();
   </script>
