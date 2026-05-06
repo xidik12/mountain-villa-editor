@@ -85,6 +85,9 @@ const M = {
   wt:     new THREE.MeshStandardMaterial({ color: hex(0xB8B8B0), roughness: 0.3 }),
   wood:   new THREE.MeshStandardMaterial({ color: hex(0xA0703B), roughness: 0.5 }),
   alu:    new THREE.MeshStandardMaterial({ color: hex(0x3A3A3A), roughness: 0.4, metalness: 0.7 }),
+  // Reinforced-concrete colours for Construction view (columns + beams)
+  rcCol:  new THREE.MeshStandardMaterial({ color: hex(0xC97851), roughness: 0.85, emissive: hex(0x4a2410), emissiveIntensity: 0.25 }),
+  rcBeam: new THREE.MeshStandardMaterial({ color: hex(0x8a6f55), roughness: 0.85, emissive: hex(0x3a2a18), emissiveIntensity: 0.25 }),
   // Matte near-black for window mullions/frames — reads cleanly against glass
   // and against the white wall, like the reference photo.
   winFrame: new THREE.MeshStandardMaterial({ color: hex(0x14161A), roughness: 0.55, metalness: 0.25 }),
@@ -115,6 +118,7 @@ const M = {
 // === LAYERS ===
 const LAYER_NAMES = [
   'Site', 'Foundation',
+  'Columns', 'Beams',                       // structural — visible in Construction view
   'Walls_Exterior', 'Walls_Interior',
   'Trim_Eaves', 'Roof', 'Ceilings',
   'Doors', 'Windows',
@@ -122,6 +126,7 @@ const LAYER_NAMES = [
   'Furniture_Dining', 'Furniture_Kitchen',
   'Furniture_Bath', 'Furniture_WC',
   'Lighting_Fixtures',
+  'Construction_Annotations',               // 3D labels (C1–C9 etc.) shown only in Construction view
 ];
 const layers = {};
 LAYER_NAMES.forEach(n => {
@@ -322,6 +327,9 @@ function buildVilla() {
   // Wet floor overlays — Bath at (6-8, 0-2), WC at (8-9.5, 0-2)
   soloBox('FloorTile_Bath', 'Foundation', [7.0,  1.0, 0.4525], [1.825, 1.825, 0.005], M.wet);
   soloBox('FloorTile_WC',   'Foundation', [8.75, 1.0, 0.4525], [1.325, 1.825, 0.005], M.wet);
+
+  // === STRUCTURAL CONCRETE (Columns + Beams — visible in Construction view) ===
+  buildStructure();
 
   // === WALL DEFINITIONS (metadata only — geometry rebuilt later from openings) ===
   const wallTop = p.wallTopZ, wallBot = p.wallBtmZ;
@@ -534,6 +542,131 @@ function buildVilla() {
 
   // Now that all openings exist, generate wall segments around them.
   rebuildAllWalls();
+}
+
+// === STRUCTURE — 9 RC columns + ring beam + tie beam over P2 + door/window lintels ===
+// Visible in both views, but stylistically lit (orange-warm RC tone) so they
+// stand out against the white walls in Construction mode. Walls hide them
+// in Finished mode by being visually dominant; toggling Construction view
+// hides walls/finishes so the column grid + beams are clearly readable.
+function buildStructure() {
+  const p = params;
+  const FFL = p.wallBtmZ;
+  // Columns top into the ring beam (which sits at top of N wall in our shed roof
+  // — i.e., at +wallTopZ). Column extends from grade (slightly above grade) up
+  // through the ring beam.
+  const colBot = 0.05;                     // just above plinth top
+  const colTop = p.wallTopZ + 0.05;        // ~5 cm proud of ring beam top
+  const colSec = 0.25;                     // 250 × 250 RC
+  const cols = [
+    { id: 'C1', x: 0.10,    y: 0.10 },
+    { id: 'C2', x: p.envX - 0.10, y: 0.10 },
+    { id: 'C3', x: 0.10,    y: p.envY - 0.10 },
+    { id: 'C4', x: p.envX - 0.10, y: p.envY - 0.10 },
+    { id: 'C5', x: 4.75,    y: 0.10 },
+    { id: 'C6', x: 4.75,    y: p.envY - 0.10 },
+    { id: 'C7', x: 0.10,    y: 3.50 },
+    { id: 'C8', x: p.envX - 0.10, y: p.P2_y },
+    { id: 'C9', x: 0.10,    y: p.P2_y },
+  ];
+  cols.forEach(c => {
+    const a = assembly(`Column_${c.id}`, 'Columns');
+    partBox(a, '_shaft', [c.x, c.y, (colBot + colTop) / 2], [colSec, colSec, colTop - colBot], M.rcCol);
+    setAnchor(a, c.x, c.y, FFL);
+    // Label sprite — placed at top of column, only shown in Construction view
+    const label = makeTextSprite(c.id, 0.55);
+    label.position.set(c.x, c.y, colTop + 0.7);
+    label.userData.isAnnotation = true;
+    layers['Construction_Annotations'].add(label);
+  });
+
+  // Ring beam — perimeter, 250 × 400, top at wallTopZ
+  const ringBeamTop = p.wallTopZ;
+  const ringBeamBot = p.wallTopZ - 0.40;
+  const ringBeamSec = 0.25;
+  const a = assembly('Ring_beam', 'Beams');
+  // Four perimeter segments (sit just inside the wall outer face)
+  partBox(a, '_S', [p.envX/2, p.extWT/2, (ringBeamTop + ringBeamBot) / 2], [p.envX, ringBeamSec, ringBeamTop - ringBeamBot], M.rcBeam);
+  partBox(a, '_N', [p.envX/2, p.envY - p.extWT/2, (ringBeamTop + ringBeamBot) / 2], [p.envX, ringBeamSec, ringBeamTop - ringBeamBot], M.rcBeam);
+  partBox(a, '_W', [p.extWT/2, p.envY/2, (ringBeamTop + ringBeamBot) / 2], [ringBeamSec, p.envY - 2*p.extWT, ringBeamTop - ringBeamBot], M.rcBeam);
+  partBox(a, '_E', [p.envX - p.extWT/2, p.envY/2, (ringBeamTop + ringBeamBot) / 2], [ringBeamSec, p.envY - 2*p.extWT, ringBeamTop - ringBeamBot], M.rcBeam);
+
+  // Tie beam over P2 (long bedroom-row partition)
+  const tieBot = p.wallTopZ - 0.30;
+  const tieTop = p.wallTopZ;
+  const tie = assembly('Tie_beam_P2', 'Beams');
+  partBox(tie, '_main', [p.envX/2, p.P2_y, (tieTop + tieBot) / 2], [p.envX, 0.20, tieTop - tieBot], M.rcBeam);
+
+  // Lintels over each opening (compact RC bands above doors + windows)
+  buildLintels();
+}
+
+function buildLintels() {
+  const p = params;
+  const FFL = p.wallBtmZ;
+  // Door lintels (200 × 250 above 2.4 m doors → top of lintel at FFL + 2.65)
+  const doorLin = [
+    { id: 'D1', x: 2.0,    y: p.P2_y, axis: 'y', w: 0.9 },
+    { id: 'D2', x: 4.75,   y: p.P2_y, axis: 'y', w: 0.9 },
+    { id: 'D3', x: 5.5,    y: 6.85,   axis: 'x', w: 0.9 },
+    { id: 'D4', x: 7.0,    y: 2.0,    axis: 'y', w: 0.8 },
+    { id: 'D5', x: 8.75,   y: 2.0,    axis: 'y', w: 0.7 },
+    { id: 'D6', x: 4.0,    y: 0,      axis: 'y', w: 1.5 },
+    { id: 'D7', x: p.envX, y: 3.0,    axis: 'x', w: 0.9 },
+  ];
+  doorLin.forEach(d => {
+    const a = assembly(`Lintel_${d.id}`, 'Beams');
+    const z = FFL + 2.4 + 0.125;
+    if (d.axis === 'y') partBox(a, '_lin', [d.x, d.y, z], [d.w + 0.40, 0.20, 0.25], M.rcBeam);
+    else                partBox(a, '_lin', [d.x, d.y, z], [0.20, d.w + 0.40, 0.25], M.rcBeam);
+  });
+
+  // Window lintels — uniform 2.5 × 2.6 casements (W1–W6) get 250 × 350 + steel.
+  // W7/W8 get 150 × 200. Top of lintel = top of window opening + 0.25
+  const winLin = [
+    { id: 'W1', x: 0,       y: 9.25, axis: 'x', w: 2.5, h: 2.6, sill: 0.5, big: true },
+    { id: 'W2', x: p.envX,  y: 9.25, axis: 'x', w: 2.5, h: 2.6, sill: 0.5, big: true },
+    { id: 'W3', x: p.envX,  y: 5.75, axis: 'x', w: 2.5, h: 2.6, sill: 0.5, big: true },
+    { id: 'W4', x: 0,       y: 5.0,  axis: 'x', w: 2.5, h: 2.6, sill: 0.5, big: true },
+    { id: 'W5', x: 0,       y: 2.0,  axis: 'x', w: 2.5, h: 2.6, sill: 0.5, big: true },
+    { id: 'W6', x: 1.5,     y: 0,    axis: 'y', w: 2.5, h: 2.6, sill: 0.5, big: true },
+    { id: 'W7', x: 7.0,     y: 0,    axis: 'y', w: 0.5, h: 0.6, sill: 2.8, big: false },
+    { id: 'W8', x: 8.75,    y: 0,    axis: 'y', w: 0.6, h: 0.6, sill: 2.8, big: false },
+  ];
+  winLin.forEach(wn => {
+    const a = assembly(`Lintel_${wn.id}`, 'Beams');
+    const linH = wn.big ? 0.35 : 0.20;
+    const linDepth = wn.big ? 0.25 : 0.15;
+    const linTop = FFL + wn.sill + wn.h + linH;
+    const z = linTop - linH/2;
+    if (wn.axis === 'y') partBox(a, '_lin', [wn.x, wn.y, z], [wn.w + 0.40, linDepth, linH], M.rcBeam);
+    else                 partBox(a, '_lin', [wn.x, wn.y, z], [linDepth, wn.w + 0.40, linH], M.rcBeam);
+  });
+}
+
+// Simple billboarded text sprite for Construction-view labels (C1, C2, etc.)
+function makeTextSprite(text, size = 0.5) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(255, 235, 100, 0.95)';
+  ctx.beginPath();
+  ctx.arc(128, 128, 110, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#1a1d22';
+  ctx.lineWidth = 8;
+  ctx.stroke();
+  ctx.fillStyle = '#1a1d22';
+  ctx.font = 'bold 110px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 138);
+  const texture = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(size, size, 1);
+  sprite.name = `Label_${text}`;
+  return sprite;
 }
 
 function buildFlatRoof() {
@@ -1202,6 +1335,51 @@ function findLayerOf(obj) {
 }
 buildSidebar();
 
+// === VIEW MODE TABS — Finished / Construction ===
+// Construction mode hides walls/roof/finishes/furniture and shows the
+// foundation, columns, beams, and 3D column-ID labels. Finished mode is
+// the full villa with everything visible.
+const VIEW_PRESETS = {
+  finished: {
+    show: ['Site', 'Foundation', 'Walls_Exterior', 'Walls_Interior', 'Trim_Eaves',
+           'Roof', 'Ceilings', 'Doors', 'Windows',
+           'Furniture_Master', 'Furniture_BR2', 'Furniture_BR1',
+           'Furniture_Dining', 'Furniture_Kitchen', 'Furniture_Bath', 'Furniture_WC',
+           'Lighting_Fixtures'],
+    hide: ['Columns', 'Beams', 'Construction_Annotations'],
+    hint: 'Finished: full villa with roof + finishes + furniture.',
+  },
+  construction: {
+    show: ['Site', 'Foundation', 'Columns', 'Beams', 'Construction_Annotations'],
+    hide: ['Walls_Exterior', 'Walls_Interior', 'Trim_Eaves',
+           'Roof', 'Ceilings', 'Doors', 'Windows',
+           'Furniture_Master', 'Furniture_BR2', 'Furniture_BR1',
+           'Furniture_Dining', 'Furniture_Kitchen', 'Furniture_Bath', 'Furniture_WC',
+           'Lighting_Fixtures'],
+    hint: 'Construction: foundation + 9 RC columns (C1–C9) + ring beam + tie beam over P2 + 15 lintels. Click Finished to switch back.',
+  },
+};
+let currentView = 'finished';
+function applyViewMode(mode) {
+  const preset = VIEW_PRESETS[mode];
+  if (!preset) return;
+  currentView = mode;
+  preset.show.forEach(n => { if (layers[n]) layers[n].visible = true; });
+  preset.hide.forEach(n => { if (layers[n]) layers[n].visible = false; });
+  document.querySelectorAll('.view-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === mode);
+  });
+  const hintEl = document.getElementById('view-hint');
+  if (hintEl) hintEl.textContent = preset.hint;
+}
+document.querySelectorAll('.view-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    applyViewMode(btn.dataset.view);
+    buildSidebar();             // refresh layer-panel checkboxes
+  });
+});
+applyViewMode('finished');
+
 const camerasDiv = document.getElementById('cameras');
 camerasDiv.innerHTML = '';
 const camPresets = {
@@ -1258,6 +1436,7 @@ document.getElementById('rebuild').addEventListener('click', () => {
   setSelected(null);
   buildVilla();
   buildSidebar();
+  if (typeof applyViewMode === 'function') applyViewMode(currentView);
   if (typeof recordChange === 'function') recordChange();
 });
 
