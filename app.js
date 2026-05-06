@@ -1107,56 +1107,10 @@ function buildFurniture() {
     return a;
   }
 
-  const P4y = params.P4_y;
+  // v6.4 — bedroom + dining + bath + WC furniture removed per user request.
+  // Only the studio kitchen remains so the empty rooms are easier to inspect.
 
-  // === MASTER BD3 (v6 — 4 × 3.5, x=0-4, y=7.5-11) — wardrobe relocated to east wall
-  bed('Master_bed', 2.0, 9.85, 'north', 'Furniture_Master');
-  nightstand('Master_nightstand_L', 0.85, 10.65, 'Furniture_Master', 0.4, 0.4, 0.6);
-  nightstand('Master_nightstand_R', 3.15, 10.65, 'Furniture_Master', 0.4, 0.4, 0.6);
-  // Wardrobe along east wall (P1) — was on south wall blocking D1 in v5
-  wardrobe('Master_wardrobe', 3.65, 8.475, 'Furniture_Master', 1.8, 0.55, 2.4, 'ns');
-  roundChair('Master_reading_chair', 0.5, 9.5, 'Furniture_Master');
-  fan('Master_ceiling_fan', 2.0, 9.25);
-
-  // === BR2 (v6 — 5.5 × 3.5, x=4-9.5, y=7.5-11)
-  bed('BR2_bed', 6.75, 9.85, 'north', 'Furniture_BR2');
-  nightstand('BR2_nightstand_L', 5.675, 10.65, 'Furniture_BR2', 0.4, 0.4, 0.6);
-  nightstand('BR2_nightstand_R', 7.85, 10.65, 'Furniture_BR2', 0.4, 0.4, 0.6);
-  wardrobe('BR2_wardrobe', 6.6, 7.85, 'Furniture_BR2', 2.2, 0.55, 2.4, 'ew');
-  soloBox('BR2_desk', 'Furniture_BR2', [9.075, 9.0, FFL + 0.375], [0.5, 0.8, 0.75], M.wood);
-  roundChair('BR2_desk_chair', 9.0, 8.45, 'Furniture_BR2');
-  roundChair('BR2_sitting_chair', 4.5, 9.5, 'Furniture_BR2');
-  fan('BR2_ceiling_fan', 6.75, 9.25);
-
-  // === BR1 (v6 — 4 × 3.5, x=5.5-9.5, y=4-7.5), bed E-W head W
-  const br1cy = (P4y + p.P2_y) / 2;
-  bed('BR1_bed', 6.575, 4.875, 'west', 'Furniture_BR1');
-  nightstand('BR1_nightstand', 7.875, 4.875, 'Furniture_BR1', 0.35, 0.35, 0.6);
-  wardrobe('BR1_wardrobe', 7.6, 7.15, 'Furniture_BR1', 2.2, 0.55, 2.4, 'ew');   // along N wall, clear of D3
-  dresser('BR1_dresser', 9.175, 6.4, 'Furniture_BR1', 0.5, 1.0, 1.0, 'ns');     // E wall
-  fan('BR1_ceiling_fan', 7.5, br1cy);
-
-  // === DINING (L-shape main rect x=0..5.5, y=0..7)
-  const dt = assembly('Dining_table', 'Furniture_Dining');
-  partBox(dt, '_top', [2.4, 3.1, FFL + 0.74], [2.40, 1.00, 0.04], M.wood);
-  for (const [i, [ox, oy]] of [[-1.10, -0.45], [1.10, -0.45], [-1.10, 0.45], [1.10, 0.45]].entries()) {
-    partBox(dt, `_leg${i}`, [2.4 + ox, 3.1 + oy, FFL + 0.36], [0.06, 0.06, 0.72], M.wood);
-  }
-  setAnchor(dt, 2.4, 3.1, FFL + 0.4);
-  for (let i = 0; i < 3; i++) {
-    const x = [1.6, 2.4, 3.2][i];
-    chair(`Dining_chair_N${i+1}`, x, 3.85, 'south', 'Furniture_Dining');
-    chair(`Dining_chair_S${i+1}`, x, 2.35, 'north', 'Furniture_Dining');
-  }
-  soloBox('Dining_sideboard', 'Furniture_Dining', [0.4, 3.5, FFL + 0.45], [0.6, 1.6, 0.90], M.wood);
-  soloBox('Dining_rug', 'Furniture_Dining', [2.4, 3.0, FFL + 0.005], [2.8, 1.8, 0.005], M.rug);
-  const pen = assembly('Dining_pendant', 'Lighting_Fixtures');
-  partCyl(pen, '_cord', [2.4, 3.1, FFL + 2.30], 0.01, 0.80, M.metal);
-  partBox(pen, '_lamp', [2.4, 3.1, FFL + 1.85], [0.70, 0.30, 0.20], M.metal);
-  setAnchor(pen, 2.4, 3.1, FFL + 2.0);
-  fan('Dining_ceiling_fan', 4.0, 5.5);
-
-  // === KITCHEN (against bath W wall = P6 inner face x=5.925)
+  // === KITCHEN (against bath W wall = P6 inner face x=5.925) ===
   const kit = assembly('Kitchen_counter', 'Furniture_Kitchen');
   partBox(kit, '_base', [5.65, 1.0, FFL + 0.425], [0.6, 1.8, 0.85], M.wood);
   partBox(kit, '_top',  [5.65, 1.0, FFL + 0.86], [0.62, 1.82, 0.04], M.counter);
@@ -1165,25 +1119,7 @@ function buildFurniture() {
   setAnchor(kit, 5.65, 1.0, FFL + 0.5);
   soloBox('Kitchen_range_hood', 'Furniture_Kitchen', [5.65, 1.70, FFL + 1.95], [0.62, 0.42, 0.40], M.alu);
   soloBox('Kitchen_upper_cabinets', 'Furniture_Kitchen', [5.50, 1.0, FFL + 1.85], [0.35, 1.80, 0.70], M.wood);
-  // Fridge moved out of D6 entry path — now west of kitchen counter (counter at x=5.65)
   soloBox('Kitchen_fridge', 'Furniture_Kitchen', [5.05, 0.45, FFL + 0.85], [0.6, 0.6, 1.70], M.alu);
-
-  // === BATH (2×2, x=6-8, y=0-2) — shower NE corner
-  const sh = assembly('Bath_shower', 'Furniture_Bath');
-  partBox(sh, '_tray', [7.57, 0.63, FFL + 0.025], [0.78, 0.78, 0.05], M.wt);
-  partBox(sh, '_glassN', [7.57, 1.02, FFL + 1.05], [0.78, 0.01, 2.10], M.glass);
-  partBox(sh, '_glassW', [7.18, 0.63, FFL + 1.05], [0.01, 0.78, 2.10], M.glass);
-  setAnchor(sh, 7.57, 0.63, FFL + 1.0);
-  soloBox('Bath_sink', 'Furniture_Bath', [6.275, 0.4, FFL + 0.85], [0.40, 0.50, 0.18], M.porc);
-  soloBox('Bath_mirror', 'Furniture_Bath', [6.10, 0.4, FFL + 1.65], [0.06, 0.50, 0.70], M.alu);
-
-  // === WC (1.5×2, x=8-9.5, y=0-2)
-  const toilet = assembly('WC_toilet', 'Furniture_WC');
-  partBox(toilet, '_tank', [8.75, 0.30, FFL + 0.55], [0.40, 0.20, 0.50], M.porc);
-  partBox(toilet, '_bowl', [8.75, 0.65, FFL + 0.20], [0.40, 0.50, 0.40], M.porc);
-  partBox(toilet, '_seat', [8.75, 0.65, FFL + 0.41], [0.36, 0.46, 0.03], M.porc);
-  setAnchor(toilet, 8.75, 0.5, FFL + 0.4);
-  soloBox('WC_basin', 'Furniture_WC', [9.275, 1.475, FFL + 0.85], [0.25, 0.35, 0.15], M.porc);
 }
 
 buildVilla();
@@ -1863,20 +1799,26 @@ function uploadJSON() {
 function resetToDefaults() {
   if (!confirm('Discard all your changes and reset to the original layout?')) return;
   clearLocal();
-  // Re-init params to canonical defaults
+  // Re-init params to canonical v6.4 defaults
   Object.assign(params, {
     envX: 9.5, envY: 11.0,
-    wallTopZ: 3.25, wallBtmZ: 0.45,
-    peakZ: 5.45, ridgeY: 5.5,
-    ridgeXfromW: 1.4, ridgeXfromE: 1.4,
-    extWT: 0.20, intWT: 0.15,
+    wallBtmZ: 0.60, wallTopZ: 4.10, wallTopS: 5.06,
+    roofPitchDeg: 5,
+    peakZ: 5.06, ridgeY: 0, ridgeXfromW: 1.4, ridgeXfromE: 1.4,
+    extWT: 0.15, intWT: 0.10,
     ovh: { n: 0.8, s: 0.8, e: 0.8, w: 1.2 },
     roofThick: 0.10,
-    P4_y: 3.5,
+    P2_y: 7.5, P4_y: 4.0,
+    roofType: 'shed',
+    parapetH: 0.30,
+    pvPanels: 48, pvCols: 8, pvRows: 6,
+    pvPanelW: 1.134, pvPanelH: 1.722,
+    pvCenterX: 4.75, pvCenterY: 5.5,
   });
   setSelected(null);
   buildVilla();
   buildSidebar();
+  if (typeof applyViewMode === 'function') applyViewMode(currentView);
 }
 
 // Hook the File buttons (added via index.html below)
