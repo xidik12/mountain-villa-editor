@@ -8,13 +8,14 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
 // Bath/WC zone shrinks from y=0..2 to y=0..1.5 to accommodate.
 // ========================================================================
 
-// On desktop the sidebar takes a fixed 320 px column to the right of the canvas.
-// On mobile / small tablets (<= 1024 px) the sidebar becomes a slide-in drawer
-// that floats *over* the canvas — the canvas should always fill the full
-// viewport regardless of drawer state. Without this, the canvas was being
-// undersized by 320 px, leaving a gap that the drawer happened to cover.
+// Sidebar is collapsible at any screen size. State lives on body via the
+// `.sidebar-open` class. The canvas takes:
+//   - full viewport width on mobile (drawer floats over the canvas), OR
+//   - full viewport width on desktop when the sidebar is hidden, OR
+//   - viewport - 320 px on desktop when the sidebar is shown.
 const isMobile = () => window.innerWidth <= 1024;
-const sidebarWidth = () => (isMobile() ? 0 : 320);
+const sidebarOpen = () => document.body.classList.contains('sidebar-open');
+const sidebarWidth = () => (isMobile() || !sidebarOpen() ? 0 : 320);
 const viewW = () => window.innerWidth - sidebarWidth();
 const viewH = () => window.innerHeight;
 

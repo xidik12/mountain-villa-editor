@@ -3,14 +3,25 @@ html, body {
   margin: 0; padding: 0; height: 100%; overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
-#app { display: grid; grid-template-columns: 1fr 320px; height: 100vh; }
+/* Default: sidebar collapsed (canvas full width). JS adds `.sidebar-open`
+   on body to expand it; CSS expands the sidebar column. */
+#app {
+  display: grid;
+  grid-template-columns: 1fr 0;
+  height: 100vh;
+  transition: grid-template-columns 0.25s ease;
+}
+body.sidebar-open #app { grid-template-columns: 1fr 320px; }
 #viewport { width: 100%; height: 100%; display: block; }
 #sidebar {
   background: #1a1d22; color: #d8dde3;
   padding: 16px 18px; overflow-y: auto;
   border-left: 1px solid #2a2e35;
   font-size: 13px;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
 }
+body.sidebar-open #sidebar { transform: translateX(0); }
 #sidebar h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
 #sidebar h2 {
   margin: 22px 0 8px; font-size: 11px; font-weight: 600;
@@ -177,31 +188,38 @@ html, body {
   background: #5a2a2a; color: #fff;
 }
 
-/* ====== Mobile sidebar drawer ====== */
-/* Toggle button — visible whenever the sidebar is in drawer mode (≤1024px).
-   Bigger + bolder than before so it's obvious there's a panel hiding behind it. */
+/* ====== Sidebar toggle — visible on all screen sizes ====== */
 #sidebar-toggle {
-  display: none;
+  display: flex;                   /* always visible — collapsible at any size */
+  align-items: center;
+  justify-content: center;
   position: fixed;
   top: 14px; right: 14px;
   z-index: 1100;
-  width: 52px; height: 52px;
-  background: #1d4ed8;
+  width: 44px; height: 44px;
+  background: rgba(20, 22, 26, 0.92);
   color: #fff;
-  border: 1px solid #2563eb;
-  border-radius: 12px;
-  font-size: 26px; line-height: 1;
+  border: 1px solid #353a44;
+  border-radius: 10px;
+  font-size: 22px; line-height: 1;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   font-family: inherit;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: right 0.25s ease, transform 0.15s ease, background 0.15s ease;
 }
-#sidebar-toggle:active { transform: scale(0.94); background: #1e40af; }
-/* Hide the toggle while the drawer is open — the backdrop tap closes it. */
-#sidebar.open ~ #sidebar-toggle,
-body:has(#sidebar.open) #sidebar-toggle { display: none; }
+#sidebar-toggle:hover { background: #2f343d; }
+#sidebar-toggle:active { transform: scale(0.94); }
 
+/* Desktop: when the sidebar is open, push the toggle inside the sidebar so
+   it doesn't overlap the panel content. */
+@media (min-width: 1025px) {
+  body.sidebar-open #sidebar-toggle {
+    right: 332px;                  /* sidebar width 320 + 12 px gap */
+  }
+}
+
+/* Backdrop only used on mobile (CSS hides it on desktop) */
 #sidebar-backdrop {
   display: none;
   position: fixed; inset: 0;
@@ -209,39 +227,50 @@ body:has(#sidebar.open) #sidebar-toggle { display: none; }
   z-index: 1090;
   -webkit-tap-highlight-color: transparent;
 }
-#sidebar-backdrop.open { display: block; }
+@media (max-width: 1024px) {
+  body.sidebar-open #sidebar-backdrop { display: block; }
+}
 
 /* ====== Drawer mode: ≤1024px (covers all phones + tablets in portrait) ====== */
 @media (max-width: 1024px) {
+  /* Canvas fills the whole window; sidebar floats over it as a drawer. */
   #app {
-    display: block;                 /* canvas fills the whole window */
-    height: 100vh;
-    height: 100dvh;                 /* respect mobile browser chrome */
+    display: block;
+    height: 100vh; height: 100dvh;
+    grid-template-columns: none !important;
   }
+  body.sidebar-open #app { grid-template-columns: none !important; }
   #viewport {
     width: 100vw !important;
     height: 100vh !important;
     height: 100dvh !important;
   }
-  #sidebar-toggle { display: flex; align-items: center; justify-content: center; }
+
+  /* Bigger, more prominent toggle on touch devices */
+  #sidebar-toggle {
+    width: 52px; height: 52px;
+    background: #1d4ed8;
+    border-color: #2563eb;
+    border-radius: 12px;
+    font-size: 26px;
+  }
+  #sidebar-toggle:active { background: #1e40af; }
+  /* Hide toggle while drawer is open — backdrop tap closes it */
+  body.sidebar-open #sidebar-toggle { display: none; }
 
   #sidebar {
     position: fixed;
     top: 0; right: 0; bottom: 0;
     width: min(88vw, 380px);
-    transform: translateX(100%);
-    transition: transform 0.25s ease;
     z-index: 1095;
     box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
     padding: 18px 18px 24px;
-    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
-  #sidebar.open { transform: translateX(0); }
 
   /* Close-button hint at the very top of the drawer */
   #sidebar h1::after {
-    content: "✕  Tap outside to close";
+    content: "✕  Tap outside or press Esc to close";
     display: block;
     margin-top: 4px;
     font-size: 11px;

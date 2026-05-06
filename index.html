@@ -101,39 +101,44 @@
   </div>
 
   <script>
-    // Mobile sidebar drawer (vanilla, no framework)
+    // Sidebar can be collapsed/expanded at any screen size. State lives on
+    // `body.sidebar-open`. Persists across reloads via localStorage.
     (function () {
       const tog = document.getElementById('sidebar-toggle');
-      const sb = document.getElementById('sidebar');
       const bd = document.getElementById('sidebar-backdrop');
-      if (!tog || !sb || !bd) return;
-      // Fire a resize event so the Three.js renderer recomputes the canvas size
-      // for the new layout state. The CSS animation lasts 250 ms so we re-fire
-      // again after the transition ends to lock the final dimensions.
-      const reflow = () => {
-        window.dispatchEvent(new Event('resize'));
-      };
-      const close = () => {
-        sb.classList.remove('open');
-        bd.classList.remove('open');
+      if (!tog || !bd) return;
+      const KEY = 'mv-sidebar-open';
+      const isMobile = () => window.innerWidth <= 1024;
+      // Initial state: respect saved preference if present, otherwise open on
+      // desktop and closed on mobile.
+      const stored = localStorage.getItem(KEY);
+      const initOpen = stored !== null ? stored === '1' : !isMobile();
+      document.body.classList.toggle('sidebar-open', initOpen);
+      // Fire window resize so renderer.setSize() picks up the new canvas
+      // dimensions. Re-fire after CSS transition ends to lock final size.
+      const reflow = () => window.dispatchEvent(new Event('resize'));
+      const setOpen = (open) => {
+        document.body.classList.toggle('sidebar-open', open);
+        localStorage.setItem(KEY, open ? '1' : '0');
         reflow();
         setTimeout(reflow, 280);
       };
-      const open = () => {
-        sb.classList.add('open');
-        bd.classList.add('open');
-      };
       tog.addEventListener('click', () => {
-        sb.classList.contains('open') ? close() : open();
+        setOpen(!document.body.classList.contains('sidebar-open'));
       });
-      bd.addEventListener('click', close);
-      // Close on Escape
+      // On mobile the backdrop closes the drawer; on desktop the backdrop is
+      // never shown (CSS handles it), so this is a no-op on big screens.
+      bd.addEventListener('click', () => setOpen(false));
       document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && sb.classList.contains('open')) close();
+        if (e.key === 'Escape' && document.body.classList.contains('sidebar-open') && isMobile()) {
+          setOpen(false);
+        }
       });
-      // Close drawer if the window is resized back to desktop
+      // Re-fire reflow when the window itself resizes (rotation, etc.)
+      let resizeTimer;
       window.addEventListener('resize', () => {
-        if (window.innerWidth > 1024) close();
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(reflow, 100);
       });
     })();
   </script>
