@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="118" viewBox="0 0 1200 118"
+     role="img" aria-labelledby="t d">
+  <title id="t">Get started</title><desc id="d">Section header: get started, with a terminal command motif.</desc>
+  <rect x="1" y="1" width="1198" height="116" rx="16" fill="#15181d" stroke="#23262d"/>
+  <rect x="1" y="1" width="7" height="116" rx="3" fill="#f5b942"/>
+  <text x="46" y="70" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="30" font-weight="700" fill="#2f3540">04</text>
+  <text x="110" y="55" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" font-size="29" font-weight="700" letter-spacing="-0.4" fill="#eef2f7">Get started</text>
+  <text x="112" y="82" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" letter-spacing="0.4" fill="#7e8694">SERVE OVER HTTP &#183; OPEN IN ANY MODERN BROWSER</text>
+  <g transform="translate(1040 58)" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+      <rect x="-116" y="-30" width="200" height="60" rx="6" fill="#0e1014" stroke="#333944"/>
+      <circle cx="-104" cy="-19" r="3" fill="#ef4444"/><circle cx="-94" cy="-19" r="3" fill="#f5b942"/><circle cx="-84" cy="-19" r="3" fill="#22c55e"/>
+      <text x="-104" y="7" font-size="12.5" fill="#c8d0da"><tspan fill="#22c55e">$</tspan> python3 -m http.server</text>
+      <text x="-104" y="24" font-size="11" fill="#7e8694">&#8594; localhost:8000 <tspan fill="#2563eb">&#9613;</tspan></text></g>
+</svg>

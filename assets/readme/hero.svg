@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="430" viewBox="0 0 1200 430"
+     role="img" aria-labelledby="title desc">
+  <title id="title">Mountain Villa Editor</title>
+  <desc id="desc">A browser-based Three.js editor for a 9.5 by 11 metre mountain villa: an exploded axonometric view shows the solar-carpeted shed roof lifted above a glass-walled envelope, a selected furniture piece with a red, green and blue XYZ transform gizmo, and the X-east, Y-north, Z-up coordinate origin at the south-west corner.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#171a1f"/>
+      <stop offset="1" stop-color="#101216"/>
+    </linearGradient>
+    <linearGradient id="roofG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a2c4d"/>
+      <stop offset="1" stop-color="#12203b"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="430" rx="22" fill="url(#bg)"/>
+  <rect x="1" y="1" width="1198" height="428" rx="21" fill="none" stroke="#2a2e35" stroke-width="1"/>
+
+  <!-- soft ground shadow under the villa -->
+  <ellipse cx="895" cy="378" rx="150" ry="30" fill="#000000" opacity="0.28"/>
+
+  <!-- ============ LEFT: TITLE BLOCK ============ -->
+  <g transform="translate(64 0)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif">
+    <text x="2" y="98" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="13.5" letter-spacing="3.2" fill="#7e8694">BROWSER 3D EDITOR &#183; THREE.JS r160</text>
+
+    <text x="0" y="176" font-size="66" font-weight="700" letter-spacing="-1.5" fill="#eef2f7">Mountain Villa</text>
+    <text x="0" y="242" font-size="66" font-weight="700" letter-spacing="-1.5" fill="#3b82f6">Editor<tspan fill="#2563eb"> &#9613;</tspan></text>
+
+    <text x="2" y="292" font-size="18" fill="#b8c0cc">A Three.js editor that mirrors the Blender model of a</text>
+    <text x="2" y="318" font-size="18" fill="#b8c0cc">9.5 &#215; 11 m mountain villa &#8212; move furniture, doors and</text>
+    <text x="2" y="344" font-size="18" fill="#b8c0cc">windows, toggle 20 layers, resize the envelope live.</text>
+
+    <!-- metadata pills -->
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#c8d0da">
+      <g transform="translate(0 372)">
+        <rect x="0"   y="0" width="92"  height="28" rx="6" fill="#1e2129" stroke="#333944"/>
+        <text x="46"  y="18.5" text-anchor="middle">9.5 &#215; 11 m</text>
+        <rect x="104" y="0" width="92"  height="28" rx="6" fill="#1e2129" stroke="#333944"/>
+        <text x="150" y="18.5" text-anchor="middle" fill="#8fb4ff">20 LAYERS</text>
+        <rect x="208" y="0" width="100" height="28" rx="6" fill="#1e2129" stroke="#333944"/>
+        <text x="258" y="18.5" text-anchor="middle">8 CAMERAS</text>
+        <rect x="320" y="0" width="104" height="28" rx="6" fill="#1e2129" stroke="#333944"/>
+        <text x="372" y="18.5" text-anchor="middle">AUTO-SAVE</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ============ RIGHT: EXPLODED VILLA ============ -->
+  <g id="villa">
+    <!-- floor slab (z=0) -->
+    <polygon points="902,244 1016,306.7 884,379.3 770,316.6" fill="#191c22" stroke="#2f3540" stroke-width="1.2"/>
+    <!-- faint interior floor grid -->
+    <g stroke="#262b34" stroke-width="0.8">
+      <line x1="864" y1="264.9" x2="978" y2="327.6"/>
+      <line x1="826" y1="285.8" x2="940" y2="348.5"/>
+      <line x1="854.5" y1="313.9" x2="940" y2="266.8"/>
+      <line x1="826" y1="341" x2="911.5" y2="293.9"/>
+    </g>
+
+    <!-- furniture (selected object) sitting on the floor -->
+    <polygon points="904.4,327.2 923.6,337.7 923.6,330.8 904.4,320.2" fill="#3a4150"/>
+    <polygon points="923.6,337.7 899.6,350.9 899.6,344 923.6,330.8" fill="#2e343f"/>
+    <polygon points="904.4,320.2 923.6,330.8 899.6,344 880.4,333.4" fill="#49515f" stroke="#5a6473" stroke-width="0.8"/>
+
+    <!-- glass front walls (south + east) with cut openings -->
+    <polygon points="902,244 1016,306.7 1016,242.9 902,180.2" fill="#2563eb" fill-opacity="0.07" stroke="#3d4a5e" stroke-width="1"/>
+    <polygon points="1016,306.7 884,379.3 884,329.5 1016,242.9" fill="#2563eb" fill-opacity="0.05" stroke="#3d4a5e" stroke-width="1"/>
+    <!-- window opening (hole in south wall) -->
+    <polygon points="966.8,268.3 986,278.9 986,261.2 966.8,250.7" fill="#0e1014" stroke="#5b7fd0" stroke-width="1"/>
+    <!-- door opening (hole in east wall) -->
+    <polygon points="999.2,315.9 986,323.2 986,296.7 999.2,289.5" fill="#0e1014" stroke="#5b7fd0" stroke-width="1"/>
+
+    <!-- wall-top edges (envelope outline) -->
+    <g stroke="#6b7686" stroke-width="1.3" fill="none" stroke-linejoin="round">
+      <polyline points="902,180.2 1016,242.9 884,329.5 770,266.8 902,180.2"/>
+      <line x1="902" y1="180.2" x2="902" y2="244"/>
+      <line x1="1016" y1="242.9" x2="1016" y2="306.7"/>
+      <line x1="884" y1="329.5" x2="884" y2="379.3"/>
+      <line x1="770" y1="266.8" x2="770" y2="316.6"/>
+    </g>
+
+    <!-- exploded lift guides from wall-top to roof -->
+    <g stroke="#4a5464" stroke-width="1" stroke-dasharray="3 4">
+      <line x1="902" y1="180.2" x2="902" y2="161.3"/>
+      <line x1="1016" y1="242.9" x2="1016" y2="224"/>
+      <line x1="884" y1="329.5" x2="884" y2="310.6"/>
+      <line x1="770" y1="266.8" x2="770" y2="247.9"/>
+    </g>
+
+    <!-- shed roof carrying the solar array (lifted) -->
+    <polygon points="902,161.3 1016,224 1016,225.6 902,162.9" fill="#0f1830"/>
+    <polygon points="1016,224 884,310.6 884,312.1 1016,225.6" fill="#0b1224"/>
+    <polygon points="902,161.3 1016,224 884,310.6 770,247.9" fill="url(#roofG)" stroke="#3a5f9c" stroke-width="1.1"/>
+    <g stroke="#3f6bb0" stroke-width="0.9" opacity="0.85">
+      <line x1="916.2" y1="169.2" x2="784.2" y2="255.8"/>
+      <line x1="930.5" y1="177" x2="798.5" y2="263.6"/>
+      <line x1="944.8" y1="184.9" x2="812.8" y2="271.4"/>
+      <line x1="959" y1="192.7" x2="827" y2="279.3"/>
+      <line x1="973.2" y1="200.5" x2="841.2" y2="287.1"/>
+      <line x1="987.5" y1="208.4" x2="855.5" y2="295"/>
+      <line x1="1001.8" y1="216.2" x2="869.8" y2="302.8"/>
+      <line x1="880" y1="175.8" x2="994" y2="238.5"/>
+      <line x1="858" y1="190.2" x2="972" y2="252.9"/>
+      <line x1="836" y1="204.6" x2="950" y2="267.3"/>
+      <line x1="814" y1="219.1" x2="928" y2="281.8"/>
+      <line x1="792" y1="233.5" x2="906" y2="296.2"/>
+    </g>
+
+    <!-- coordinate origin triad at SW corner (X east / Y north / Z up) -->
+    <g stroke-width="2.2" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5" font-weight="700">
+      <line x1="902" y1="244" x2="942.8" y2="266.4" stroke="#ef4444"/>
+      <line x1="902" y1="244" x2="861.2" y2="266.4" stroke="#22c55e"/>
+      <line x1="902" y1="244" x2="902" y2="201.2" stroke="#3b82f6"/>
+      <circle cx="902" cy="244" r="2.6" fill="#e6eaf0"/>
+      <text x="948" y="270" fill="#ef4444">X&#8201;E</text>
+      <text x="836" y="270" fill="#22c55e">Y&#8201;N</text>
+      <text x="908" y="199" fill="#3b82f6">Z&#8201;up</text>
+    </g>
+
+    <!-- transform gizmo on the selected furniture -->
+    <g stroke-width="2.6" stroke-linecap="round">
+      <line x1="902" y1="332.1" x2="933.2" y2="349.3" stroke="#ef4444"/>
+      <line x1="902" y1="332.1" x2="870.8" y2="349.3" stroke="#22c55e"/>
+      <line x1="902" y1="332.1" x2="902" y2="299.3" stroke="#3b82f6"/>
+      <polygon points="933.2,349.3 926.8,347.8 928.6,352.9" fill="#ef4444"/>
+      <polygon points="870.8,349.3 877.2,347.8 875.4,352.9" fill="#22c55e"/>
+      <polygon points="902,299.3 899,305.4 905,305.4" fill="#3b82f6"/>
+      <circle cx="902" cy="332.1" r="3.4" fill="#101216" stroke="#e6eaf0" stroke-width="1.6"/>
+    </g>
+
+    <!-- floating selection tag -->
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+      <rect x="946" y="336" width="176" height="26" rx="5" fill="#14161acc" stroke="#3a4150"/>
+      <circle cx="960" cy="349" r="3.2" fill="#2563eb"/>
+      <text x="970" y="353" font-size="11.5" fill="#d8dde3">Furniture_BR2 &#183; Move (G)</text>
+    </g>
+  </g>
+</svg>
